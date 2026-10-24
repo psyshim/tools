@@ -2,6 +2,9 @@
 
 Status: **DESIGN CANDIDATE / NOT IMPLEMENTED** (2026-10-24). This document refines physical ownership. Normative external payloads remain in [INTEGRATION_CONTRACT_V0_1.md](INTEGRATION_CONTRACT_V0_1.md). Earlier prose describing many independent workflow/patch entry points is historical prototype behavior, **not** the target public architecture.
 
+
+**Decision reference:** [ADR-001 — Single authority](ADR-001_SINGLE_AUTHORITY.md) is the accepted authority/workspace/side-effect design; this document remains the migration target overview. If descriptions differ, ADR-001 controls architecture and the integration contract controls wire payloads.
+
 ## 1. Objective and design constraints
 
 The eventual receiving AI writes **only** the thin adapter between its existing chat/auth/upload machinery and a fully packaged client. This repository delivers agent runtime, SDK, mock service with adversarial scenarios, schema, examples, integration harness, security tests, and operational proof **before** transfer. No host-side decision on agent internals, local filesystem, model tools, Git, browser driving, command execution, or crash recovery.
