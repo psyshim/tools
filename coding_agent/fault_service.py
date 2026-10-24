@@ -29,7 +29,7 @@ class ScenarioStore:
             self.calls = 0
             self.drop_seen.clear()
 
-def handler_factory(token, control_token, store=None, actor_tokens=None):
+def handler_factory(token, control_token, store=None, actor_tokens=None, workspace_grants=None):
     if not token or not control_token or token == control_token:
         raise ValueError("distinct tokens required")
     state = store or ScenarioStore()
@@ -38,6 +38,9 @@ def handler_factory(token, control_token, store=None, actor_tokens=None):
         raise ValueError("invalid actor token mapping")
     if control_token in actors:
         raise ValueError("control token must be isolated")
+    grants = workspace_grants
+    if grants is not None and (not isinstance(grants, dict) or any(not isinstance(k, str) or not isinstance(v, (list, set, tuple)) or any(not isinstance(w, str) for w in v) for k, v in grants.items())):
+        raise ValueError("invalid workspace grants")
     class Handler(BaseHTTPRequestHandler):
         def send(self, code, obj):
             data = json.dumps(obj, sort_keys=True).encode()
@@ -87,6 +90,8 @@ def handler_factory(token, control_token, store=None, actor_tokens=None):
                 obj = self.body()
                 if obj.get("protocol") != "1.0" or obj.get("mode") != "read" or not isinstance(obj.get("workspace_id"), str) or not obj["workspace_id"].strip() or not isinstance(obj.get("instruction"), str) or not obj["instruction"].strip():
                     raise ValueError("unsupported request")
+                if grants is not None and obj["workspace_id"] not in grants.get(actor, ()):
+                    return self.send(403, {"error":"workspace_forbidden"})
                 digest = hashlib.sha256(json.dumps(obj, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
             except (TypeError, ValueError):
                 return self.send(400, {"error":"invalid_request"})
