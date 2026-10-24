@@ -10,7 +10,8 @@ from coding_agent.fault_service import handler_factory
 class IdentityBoundaryTests(unittest.TestCase):
     def test_cross_actor_task_hidden_and_keys_scoped(self):
         server = ThreadingHTTPServer(("127.0.0.1", 0), handler_factory(
-            "first", "control", actor_tokens={"first":"alice", "second":"bob"}))
+            "first", "control", actor_tokens={"first":"alice", "second":"bob"},
+            workspace_grants={"alice":["test-ws"], "bob":["other-ws"]}))
         worker = threading.Thread(target=server.serve_forever, daemon=True)
         worker.start()
         base=f"http://127.0.0.1:{server.server_port}"
@@ -25,11 +26,13 @@ class IdentityBoundaryTests(unittest.TestCase):
         try:
             request={"protocol":"1.0", "mode":"read", "workspace_id":"test-ws", "instruction":"inspect"}
             alice=invoke("/v1/tasks", "first", request)[1]["task_id"]
-            bob=invoke("/v1/tasks", "second", request)[1]["task_id"]
+            self.assertEqual(invoke("/v1/tasks", "second", request)[0], 403)
+            bob=invoke("/v1/tasks", "second", dict(request, workspace_id="other-ws"))[1]["task_id"]
             self.assertNotEqual(alice, bob)
             self.assertEqual(invoke("/v1/tasks/"+alice, "second")[0], 404)
             self.assertEqual(invoke("/v1/tasks/"+alice+"/events?after=0", "second")[0],404)
             self.assertEqual(invoke("/v1/tasks/"+alice, "first")[0],200)
+            self.assertEqual(invoke("/v1/tasks/"+bob, "first")[0],404)
         finally:
             server.shutdown()
             server.server_close()
