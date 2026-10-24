@@ -1,5 +1,8 @@
 """Fail-closed source-level architecture boundary checks.
 
+This is an AST import scan only. It does NOT prove runtime privilege isolation;
+sandboxed process tests are required for that (ADR-002 section 6).
+
 Run: python -m unittest tests.test_architecture_boundaries -v
 """
 import ast
