@@ -6,7 +6,9 @@ import unittest
 from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
-from code_attach import make_router
+import functools
+from code_attach import make_router as _make_router
+make_router = functools.partial(_make_router, prototype=True)
 
 def make_router_rw(*args, **kwargs):
     return make_router(*args, allow_mutation=True, **kwargs)  # these tests exercise approval + apply

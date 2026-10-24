@@ -23,6 +23,7 @@ The report includes every test ID, actual result and duration, grouped into the 
 | Execution | Missing command, fail exit, huge output, secret environment, timeout, surviving child, step/capacity limit | Report actual exit/state; bound execution/output; stop owned work; do not invent PASS |
 | Logs | Restart, full/unavailable disk, failed approval persistence | Retain existing records; refuse unrecorded approval; logging failure cannot prevent cancellation |
 | Protocol and separation | Malformed requests/results, duplicate delivery, offline dependencies, architecture leakage | Bound and classify errors; keep host/tool responsibilities separate |
+| JSON boundaries | Duplicate keys, invalid UTF-8/surrogates, truncated bodies/envelopes, nonfinite numbers, excessive depth/size, chunked oversize input | Reject before dispatch; keep shortened history valid JSON; return a correction error for invalid tool arguments; never silently repair effect arguments |
 
 ## Added capability scope
 
@@ -39,3 +40,16 @@ Git investigation includes status, working/staged diffs, recent log and branches
 Merge, rebase, cherry-pick, force/reset/clean, remote operations, recursive tree deletion, a separate OS privilege sandbox, crash-resumable execution, and real-model prompt-injection resistance are not implemented by these gates. Unsupported actions must be refused; passing tool fixtures must not be presented as proof that those capabilities work. Complex Git operations require their own preview, conflict-resolution, abort/recovery and lost-response fixtures before being exposed.
 
 Every new capability or observed defect must add a fixture with an observable invariant. CI is configured to run the full gates on Windows and Linux and retain the JSON evidence; remote CI success must be checked separately from a local run. Adding a capability without its negative/recovery cases is not sufficient.
+
+Test execution evidence also distinguishes `NO_TESTS`, `ALL_SKIPPED`, and
+`INCONSISTENT` (a wrapper exits zero while the runner reports failures). Ordinary
+zero-exit commands without a recognized test summary retain `PASS` with
+`verification=COMMAND_EXIT_ONLY`; this proves command exit only, not passing tests.
+Source SHA-256 fingerprints and any changed paths are recorded in acceptance
+reports; a changing source tree cannot produce an overall PASS.
+
+Protocol data budgets count serialized UTF-8 bytes, including JSON escaping.
+Oversized approval cards are refused before becoming decidable, with a request to
+split the proposal; an approval diff is never silently shortened. Derived display
+diagnostics may be omitted with an explicit marker, while the actual exit/status
+and bounded raw output remain available.

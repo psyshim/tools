@@ -4,27 +4,39 @@ python -m examples.adversarial_check --output adversarial-report.json
 No model credentials are needed. Tests use new temporary fixture projects.
 """
 import argparse
+import hashlib
 from datetime import datetime, timezone
 import json
 from pathlib import Path
 import platform
-import sys
 import time
 import unittest
 
 GATES = {
+    "component_logs_and_usage_management": ("test_usage_accounting.", "test_component_management.", "test_usage_process_stack.", "test_state_backup.", "test_store_schema_migration.", "test_restore_process_stack."),
+    "malformed_model_json": ("test_json_corruption.", "test_json_boundaries.", "test_json_file_repair.", "test_model_call_identity."),
     "multifile_failure_and_reference_oracle": ("test_multifile_failure_barriers.",),
     "workspace_boundary": ("test_workspace.", "test_security_boundary_regression.", "test_housekeeping."),
     "discovery_and_large_sources": ("test_code_attach_project.", "test_large_scripts."),
     "hostile_encodings": ("test_encoding_adversarial.",),
     "approval_ownership_and_conflicts": ("test_code_attach.", "test_code_attach_abnormal.", "test_mock_actor_isolation."),
-    "file_housekeeping_and_recovery": ("test_housekeeping.", "test_acceptance_flows.AcceptanceFlowTests.test_housekeeping"),
+    "file_housekeeping_and_recovery": ("test_housekeeping.", "test_new_file_failure.", "test_acceptance_flows.AcceptanceFlowTests.test_housekeeping"),
     "git_selected_commit_and_interference": ("test_git_ops.", "test_git_adversarial.", "test_acceptance_flows.AcceptanceFlowTests.test_git"),
-    "process_environment_and_budgets": ("test_code_attach_audit.", "test_code_attach_audit2.", "test_bounded_process_output.", "test_execution_owner."),
+    "process_environment_and_budgets": ("test_code_attach_audit.", "test_code_attach_audit2.", "test_bounded_process_output.", "test_execution_owner.", "test_test_evidence_barriers."),
     "privacy": ("test_code_attach_privacy.",),
-    "durable_logs_and_unknown_outcomes": ("test_local_app.", "test_journal.", "test_journaled_edit.", "test_adversarial_recovery."),
-    "architecture_and_protocol_errors": ("test_architecture_boundaries.", "test_code_attach_boundaries.", "test_fault_service."),
+    "durable_logs_and_unknown_outcomes": ("test_local_app.", "test_journal.", "test_journaled_edit.", "test_adversarial_recovery.", "test_durable_store_faults.", "test_manager_interruption.", "test_service_recovery.", "test_device_effect_uncertainty."),
+    "architecture_and_protocol_errors": ("test_architecture_boundaries.", "test_code_attach_boundaries.", "test_fault_service.", "test_source_evidence.", "test_python_compatibility.", "test_protocol_byte_budgets."),
 }
+
+
+def source_snapshot(root):
+    """Pin the actual sources, including uncommitted changes in a shared checkout."""
+    files = {}
+    for name in ("code_attach", "coding_agent", "coding_service", "device_agent", "protocol", "tests", "examples",
+                 "packages", "hostkit_build", "host_mock", "testkit", "kpi"):
+        for path in sorted((root / name).rglob("*.py")):
+            files[path.relative_to(root).as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
+    return files
 
 
 class EvidenceResult(unittest.TextTestResult):
@@ -74,8 +86,12 @@ def main():
     args = parser.parse_args()
     if not args.tests_dir.is_dir():
         parser.error("source tests are unavailable; run from the checkout or supply --tests-dir")
+    root = Path(__file__).resolve().parents[1]
+    before = source_snapshot(root)
     suite = unittest.TestLoader().discover(str(args.tests_dir.resolve()))
     result = unittest.TextTestRunner(verbosity=2, resultclass=EvidenceResult).run(suite)
+    after = source_snapshot(root)
+    changed = sorted(path for path in before.keys() | after.keys() if before.get(path) != after.get(path))
     gates = []
     for name, prefixes in GATES.items():
         records = [r for r in result.records if r["test"].startswith(prefixes)]
@@ -83,10 +99,11 @@ def main():
         status = "NOT_COVERED" if not records else "FAIL" if counts["FAIL"] or counts["ERROR"] or counts["UNMEASURED"] else "PARTIAL" if counts["SKIP"] else "PASS"
         gates.append({"gate": name, "status": status, **counts})
     covered = all(g["status"] not in {"FAIL", "NOT_COVERED"} for g in gates)
-    success = result.wasSuccessful() and covered
+    success = result.wasSuccessful() and covered and not changed
     report = {"schema": 1, "timestamp": datetime.now(timezone.utc).isoformat(),
               "environment": {"python": platform.python_version(), "os": platform.system()},
               "evidence": "offline tool/runtime acceptance; actual filesystem, subprocess and Git assertions; not model reasoning or prompt-injection evaluation",
+              "source_files_sha256": before, "source_changed_during_run": changed,
               "status": "FAIL" if not success else "PASS_WITH_SKIPS" if result.skipped else "PASS",
               "tests_run": result.testsRun, "gates": gates, "tests": result.records,
               "unsupported": ["network/push/force/reset/clean", "merge/rebase/cherry-pick", "OS privilege sandbox",

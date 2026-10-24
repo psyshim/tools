@@ -10,7 +10,7 @@ import sys
 import time
 import urllib.request
 from code_attach.engine import Engine
-from code_attach.providers import from_openai, to_openai
+from code_attach.providers import from_openai_response, to_openai
 from coding_agent.activity_log import ActivityLog, default_log_dir
 
 def complete(messages, tools):
@@ -18,7 +18,7 @@ def complete(messages, tools):
     req = urllib.request.Request(os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1") + "/chat/completions",
                                  json.dumps(payload).encode(), {"Content-Type": "application/json", "Authorization": "Bearer " + os.environ["OPENAI_API_KEY"]})
     with urllib.request.urlopen(req, timeout=120) as r:
-        return from_openai(json.load(r)["choices"][0]["message"])
+        return from_openai_response(r.read(4 * 1024 * 1024 + 1))
 
 def main(project, instruction, test_argv):
     activity = ActivityLog(default_log_dir(project))

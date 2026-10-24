@@ -28,7 +28,9 @@ The server binds to `127.0.0.1:8767` (change with `--port`). Its printed URL con
 
 ## Attach to an existing host
 
-See [ATTACH_V0.md](docs/ATTACH_V0.md) for the `make_router(complete, authorize, resolve_workspace, test_commands)` integration and provider converters for OpenAI and Anthropic message formats. The example's model/network code and browser UI are outside the reusable package.
+Production path: the host installs only the powerless `code-host-kit` wheel and writes a thin adapter ([docs/HOST_KIT.md](docs/HOST_KIT.md)); the Coding Service and the Device Agent run separately ([docs/OPERATOR_GUIDE.md](docs/OPERATOR_GUIDE.md)).
+
+The in-process `make_router(...)` described in [ATTACH_V0.md](docs/ATTACH_V0.md) is a local prototype only and refuses to mount without `prototype=True`.
 
 ## Validation
 
@@ -39,6 +41,12 @@ python -m unittest discover -s tests -v
 Tests cover edit approval, rejection, stale-file conflicts, owner isolation, discovery, real test subprocesses, the local host, and architecture boundaries. A scripted demo does not establish real-model quality or integration with an external chat product.
 
 ## Persistent local activity logs (medium priority)
+
+For the detachable component's durable service, see [Local operations and token usage](docs/LOCAL_OPERATIONS.md).
+It provides per-task/model/cumulative measured token totals, explicit unknown usage,
+restart-safe accounting, JSONL export and preview-first retention commands. Local
+installation data can live in this component's ignored `.code-attach/` directory;
+the receiving host does not implement these management functions.
 
 The browser app and CLI example save task instructions, workspace identity, assistant output, tool results, approval requests/decisions, cancellation requests, and final states as append-only UTF-8 JSONL, one file per task. Each event is flushed and synced before processing continues. On Windows the default is `%USERPROFILE%\.code-attach\logs\<workspace-hash>\<task-id>.jsonl` (avoiding Store Python's AppData virtualization); on other systems it is `$XDG_STATE_HOME/code-attach/logs/` or `~/.local/state/code-attach/logs/`, with the same workspace/task layout. The app prints the exact directory at startup and shows it in the footer. Use `--log-dir DIR` to override the browser app's directory.
 

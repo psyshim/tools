@@ -19,9 +19,9 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install attachment test dependencies
-        run: python -m pip install fastapi httpx pyflakes
+        run: python -m pip install fastapi httpx uvicorn pyflakes
       - name: Compile all Python modules
-        run: python -m compileall -q coding_agent host_mock code_attach protocol testkit packages hostkit_build kpi examples tests
+        run: python -m compileall -q coding_agent host_mock code_attach coding_service device_agent protocol testkit packages hostkit_build kpi examples tests
       - name: Run entire test suite, including newly added tests
         run: python -m unittest discover -s tests -p 'test_*.py' -v
       - name: Build the pinned host kit
@@ -40,6 +40,23 @@ jobs:
         with:
           name: conformance-${{ matrix.python-version }}
           path: conformance-evidence.json
+  windows-processes:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install fastapi httpx uvicorn pyflakes
+      - name: Separate-process stacks, crash points and the Windows write guard
+        run: python -m examples.conformance_evidence --output conformance-windows.json
+      - name: Preserve evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: conformance-windows
+          path: conformance-windows.json
   adversarial:
     strategy:
       fail-fast: false

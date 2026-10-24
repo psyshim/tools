@@ -162,7 +162,7 @@
    ],
    "code": [
     [
-     "code_attach/session.py",
+     "coding_service/loop.py",
      "def decide"
     ]
    ],
@@ -222,7 +222,7 @@
    ],
    "code": [
     [
-     "code_attach/session.py",
+     "coding_service/loop.py",
      "class Task"
     ]
    ],
@@ -279,7 +279,7 @@
    ],
    "code": [
     [
-     "code_attach/session.py",
+     "coding_service/loop.py",
      "def cancel"
     ]
    ],
@@ -297,7 +297,7 @@
    ],
    "code": [
     [
-     "code_attach/session.py",
+     "coding_service/loop.py",
      "step limit"
     ]
    ],
@@ -319,11 +319,11 @@
    ],
    "code": [
     [
-     "code_attach/providers.py",
+     "coding_service/providers.py",
      "def to_openai"
     ],
     [
-     "code_attach/providers.py",
+     "coding_service/providers.py",
      "def to_anthropic"
     ]
    ],
@@ -480,7 +480,7 @@
    ],
    "code": [
     [
-     "code_attach/session.py",
+     "coding_service/loop.py",
      "class LogUnavailable"
     ],
     [
@@ -546,7 +546,7 @@
    ],
    "code": [
     [
-     "code_attach/session.py",
+     "coding_service/loop.py",
      "MAX_CALLS_PER_TURN"
     ],
     [
@@ -717,7 +717,7 @@
      "def make_protocol_router"
     ],
     [
-     "code_attach/wire.py",
+     "coding_service/wire.py",
      "def to_protocol_events"
     ]
    ],
@@ -796,31 +796,148 @@
     "tests.test_sample_host.DetachableHost.test_the_host_acl_is_the_hosts_own_decision_and_costs_no_network_call"
    ],
    "integration": null
+  },
+  {
+   "id": "R32",
+   "title": "Phase 5: durable Coding Service as its own process (tasks/events survive kill, idempotent, owner-scoped)",
+   "doc": [
+    "docs/OPERATOR_GUIDE.md",
+    "Restart behaviour"
+   ],
+   "code": [
+    [
+     "coding_service/store.py",
+     "class TaskStore"
+    ],
+    [
+     "coding_service/manager.py",
+     "class DurableManager"
+    ],
+    [
+     "coding_service/app.py",
+     "def create_app"
+    ]
+   ],
+   "tests": [
+    "tests.test_service_recovery.RestartKeepsMeaning.test_cursor_identity_idempotency_and_ownership_survive_a_hard_kill",
+    "tests.test_service_recovery.RestartKeepsMeaning.test_a_task_killed_while_running_is_closed_explicitly_with_no_gap_or_rewrite",
+    "tests.test_service_recovery.RestartKeepsMeaning.test_crash_right_after_acceptance_neither_loses_nor_duplicates_the_task",
+    "tests.test_service_recovery.StoreProblems.test_a_corrupt_store_stops_the_service_with_a_clear_message_instead_of_serving_nonsense"
+   ],
+   "integration": null
+  },
+  {
+   "id": "R33",
+   "title": "Phase 4: Device Agent is the only local executor; grants decide folders and capabilities; physically separate process trees",
+   "doc": [
+    "docs/OPERATOR_GUIDE.md",
+    "Device Agent"
+   ],
+   "code": [
+    [
+     "device_agent/core.py",
+     "class DeviceService"
+    ],
+    [
+     "device_agent/config.py",
+     "def load_config"
+    ],
+    [
+     "coding_service/device_client.py",
+     "class DeviceClient"
+    ]
+   ],
+   "tests": [
+    "tests.test_service_device_processes.SeparateProcessStack.test_trees_physically_separate_the_capabilities",
+    "tests.test_service_device_processes.SeparateProcessStack.test_propose_flow_across_three_isolated_parties",
+    "tests.test_service_device_processes.SeparateProcessStack.test_the_device_refuses_what_the_wire_cannot_ask_for_and_nothing_private_leaks",
+    "tests.test_service_device_processes.SeparateProcessStack.test_hosts_are_isolated_from_each_other",
+    "tests.test_service_device_processes.DeviceBoundary.test_malformed_grants_stop_the_device_before_it_listens",
+    "tests.test_service_device_processes.DeviceBoundary.test_wrong_device_token_never_reaches_the_workspace"
+   ],
+   "integration": null
+  },
+  {
+   "id": "R34",
+   "title": "Phase 6: effects only by explicit grant, approval-bound, journaled at most once, honest NEEDS_RECONCILIATION",
+   "doc": [
+    "docs/OPERATOR_GUIDE.md",
+    "Runbook: `NEEDS_RECONCILIATION`"
+   ],
+   "code": [
+    [
+     "device_agent/core.py",
+     "def _effect"
+    ],
+    [
+     "coding_agent/journal.py",
+     "class OperationJournal"
+    ]
+   ],
+   "tests": [
+    "tests.test_experimental_mutation_stack.ApprovedMutation.test_nothing_changes_before_the_decision_and_approval_applies_once_with_a_receipt",
+    "tests.test_experimental_mutation_stack.ApprovedMutation.test_rejection_changes_nothing_and_records_no_effect",
+    "tests.test_experimental_mutation_stack.ApprovedMutation.test_wrong_fingerprint_and_a_second_decision_are_refused",
+    "tests.test_experimental_mutation_stack.ApprovedMutation.test_tests_never_report_a_false_pass",
+    "tests.test_experimental_mutation_stack.RestartsAroundApproval.test_service_killed_while_a_decision_is_pending_never_applies_it_afterwards",
+    "tests.test_experimental_mutation_stack.CrashPoints.test_crash_after_claim_before_the_effect",
+    "tests.test_experimental_mutation_stack.CrashPoints.test_crash_after_the_effect_before_it_was_recorded",
+    "tests.test_experimental_mutation_stack.CrashPoints.test_crash_after_recording_before_the_response"
+   ],
+   "integration": null
+  },
+  {
+   "id": "R35",
+   "title": "Phase 6: write guard against a human's concurrent save (Windows), cancel-after-commit keeps the receipt, git commit is its own grant",
+   "doc": [
+    "docs/OPERATOR_GUIDE.md",
+    "Known limits (stated, not hidden)"
+   ],
+   "code": [
+    [
+     "coding_agent/write_guard.py",
+     "def guard"
+    ],
+    [
+     "coding_agent/write_guard.py",
+     "def replace_file"
+    ]
+   ],
+   "tests": [
+    "tests.test_write_guard.RaceInjection.test_a_change_before_the_final_check_is_detected_and_nothing_is_overwritten",
+    "tests.test_write_guard.RaceInjection.test_a_save_in_the_window_between_check_and_replace_is_refused_not_lost",
+    "tests.test_write_guard.RaceInjection.test_concurrent_apply_attempts_never_interleave",
+    "tests.test_effect_semantics.CancellationAfterCommit.test_a_cancel_that_lands_after_the_effect_never_hides_the_receipt",
+    "tests.test_effect_semantics.GitCommitSeparation.test_committing_is_its_own_grant"
+   ],
+   "integration": null
+  },
+  {
+   "id": "R36",
+   "title": "Phase 7: in-process entrances quarantined; one-page host kit and operator guide; same conformance suite against real separate processes",
+   "doc": [
+    "docs/HOST_KIT.md",
+    "Not for production"
+   ],
+   "code": [
+    [
+     "code_attach/router.py",
+     "prototype"
+    ],
+    [
+     "code_attach/protocol_router.py",
+     "prototype"
+    ]
+   ],
+   "tests": [
+    "tests.test_code_attach_posture.Posture.test_in_process_entrances_refuse_to_mount_without_the_prototype_acknowledgement",
+    "tests.test_protocol_conformance.StackReadProposeConformance.test_hostile_paths_and_secrets_never_appear_in_any_event",
+    "tests.test_protocol_conformance.StackExperimentalConformance.test_experimental_mutation_yields_a_receipt_only_after_approval"
+   ],
+   "integration": null
   }
  ],
  "deferred": [
-  {
-   "id": "D01",
-   "title": "Durable journal / crash recovery of tasks",
-   "doc": [
-    "docs/ATTACH_V0.md",
-    "No crash recovery"
-   ],
-   "code": [],
-   "tests": [],
-   "integration": null
-  },
-  {
-   "id": "D02",
-   "title": "Service/device split with signed claims (ADR-004)",
-   "doc": [
-    "docs/ADR-004_THIN_HOST_SDK_BOUNDARY.md",
-    "AgentGateway"
-   ],
-   "code": [],
-   "tests": [],
-   "integration": null
-  },
   {
    "id": "D03",
    "title": "Delete / rename files",

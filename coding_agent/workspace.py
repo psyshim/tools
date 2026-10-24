@@ -10,6 +10,14 @@ _PRIVATE_NAMES = {".git", ".env", ".npmrc", ".pypirc", ".netrc", ".ssh", ".aws",
 def _allowed(path):
     return not any(part.lower() in _PRIVATE_NAMES or part.lower().startswith(".env.") or part.lower().endswith((".pem", ".key", ".p12", ".pfx")) for part in path.parts)
 
+
+def _reparse(path):
+    """Python 3.11 has no os.path.isjunction; inspect Windows attributes directly."""
+    try:
+        return bool(getattr(path.lstat(), "st_file_attributes", 0) & 0x400)
+    except OSError:
+        return True  # an unreadable directory is not safe to traverse
+
 class Workspace:
     def __init__(self, root, max_file_bytes=1024 * 1024):
         if type(max_file_bytes) is not int or not 1 <= max_file_bytes <= 8 * 1024 * 1024:
@@ -52,7 +60,7 @@ class Workspace:
                 dirs[:] = []
                 continue
             dirs[:] = sorted(d for d in dirs if d not in skip_dirs and not (here / d).is_symlink()
-                             and not os.path.isjunction(here / d) and _allowed((here / d).relative_to(self.root)))
+                             and not _reparse(here / d) and _allowed((here / d).relative_to(self.root)))
             for name in sorted(files):
                 full = here / name
                 if full.is_symlink() or not _allowed(full.relative_to(self.root)):

@@ -25,6 +25,7 @@ from .testrun import CommandRunner, normalize_commands
 from .tools_edit import EditTools
 from .tools_nav import NavTools
 
+GRANTS = frozenset({"apply", "git_commit", "test"})
 MAX_FILE_BYTES = 8 * 1024 * 1024
 MAX_DIFF = 64000
 MAX_LINE_CHARS = 2000
@@ -52,7 +53,17 @@ class ToolBox(NavTools, EditTools):
         self.flow = Workflow(root, max_file_bytes=MAX_FILE_BYTES)
         self.files = FileOperations(root, max_file_bytes=MAX_FILE_BYTES, recycle_dir=recycle_dir)
         self._git = None
-        self.allow_mutation = bool(allow_mutation)   # False = read/propose only: no tool can change disk, run a command or commit
+        # Capability grants for effects. True = all of apply / git_commit / test (the prototype default); False = read/propose
+        # only; an iterable names exactly the grants (a device grants them per workspace and per kind of effect).
+        if allow_mutation is True:
+            self.grants = frozenset(GRANTS)
+        elif not allow_mutation:
+            self.grants = frozenset()
+        else:
+            self.grants = frozenset(allow_mutation)
+            if not self.grants <= GRANTS:
+                raise ValueError("unknown capability grant: " + ", ".join(sorted(self.grants - GRANTS)))
+        self.allow_mutation = bool(self.grants)
         self.command_specs = normalize_commands(test_commands)
         self.test_commands = {name: spec["argv"] for name, spec in self.command_specs.items()}  # name -> argv view
         self.test_timeout = test_timeout
@@ -68,6 +79,10 @@ class ToolBox(NavTools, EditTools):
         """See privacy.Scrubber: nothing identifying the person or machine may leave the process."""
         return self._scrubber.scrub(text)
 
+    def is_effect(self, name):
+        """True for tools whose execution must wait for an approval (the loop asks the toolbox; it does not know tool names)."""
+        return name in EFFECT_TOOLS
+
     def request_cancel(self):
         """Stop a running test command promptly (called by Task.cancel)."""
         self.runner.request_cancel()
@@ -75,7 +90,7 @@ class ToolBox(NavTools, EditTools):
     def schemas(self):
         out = []
         for schema in SCHEMAS:
-            if not self.allow_mutation and (schema["name"] in EFFECT_TOOLS or schema["name"] == "propose_undo"):
+            if not self._tool_granted(schema["name"]):
                 continue
             if schema["name"] == "run_tests":
                 if not self.command_specs:
@@ -107,7 +122,7 @@ class ToolBox(NavTools, EditTools):
             return shown, _digest({**summary, "env_keys": sorted(spec["env"])})
         raise ValueError("not an effect tool")
 
-    def call(self, name, args):
+    def call(self, name, args, call_id=None):   # call_id: the loop's id for this call; remote toolboxes derive idempotent op ids from it
         if not isinstance(args, dict):
             raise ValueError("arguments must be an object")
         fn = getattr(self, "t_" + name, None)
@@ -125,9 +140,21 @@ class ToolBox(NavTools, EditTools):
             result["scan_truncated"] = bool(getattr(self.ws, "scan_truncated", False))  # the walk hit its file limit
         return result
 
+    def _tool_granted(self, name):
+        """Whether the grants allow this tool to exist at all. Read and propose tools always do."""
+        if name == "run_tests":
+            return "test" in self.grants
+        if name == "apply_proposal":
+            return bool(self.grants & {"apply", "git_commit"})
+        if name == "propose_undo":
+            return "apply" in self.grants
+        if name == "propose_git_commit":
+            return "git_commit" in self.grants
+        return True
+
     def _require_mutation(self, name):
-        if not self.allow_mutation and (name in EFFECT_TOOLS or name == "propose_undo"):
-            raise ValueError("this installation is in read/propose mode: changes cannot be applied and commands cannot be run; present the proposal to the user instead")
+        if not self._tool_granted(name):
+            raise ValueError("this installation is in read/propose mode for that action: it is not granted here; present the proposal to the user instead")
 
     def _path_hint(self, args):
         """For a path that does not exist, suggest similar names: typos and wrong casing are the commonest tool failure."""
@@ -351,6 +378,9 @@ class ToolBox(NavTools, EditTools):
     # --- effects (called only after approval) ---
     def t_apply_proposal(self, proposal_id):
         self._require_mutation("apply_proposal")
+        peeked = self.proposals.get(proposal_id)
+        if peeked is not None and ("git_commit" if peeked["kind"] == "git_commit" else "apply") not in self.grants:
+            raise ValueError("this kind of change is not granted here (apply and git_commit are separate grants)")
         p = self.proposals.pop(proposal_id, None)
         if p is None:
             raise ValueError("unknown or already used proposal")

@@ -159,12 +159,24 @@ class EditTools:
                     return {"status": "CONFLICT", "detail": f"{item['path']} already exists", "applied": []}
             elif _sha(self.ws.resolve(item["path"]).read_bytes()) != item["sha"]:
                 return {"status": "CONFLICT", "detail": f"{item['path']} changed since the proposal", "applied": []}
-        done = []
+        done, created_dirs = [], []
         try:
             for item in items:   # phase 2: apply in order, remembering how to reverse each step
                 if item["op"] == "create":
                     target = self.files.resolve(item["path"])
-                    target.parent.mkdir(parents=True, exist_ok=True)
+                    missing, parent = [], target.parent
+                    while not parent.exists() and parent != self.ws.root:
+                        missing.append(parent)
+                        parent = parent.parent
+                    for parent in reversed(missing):
+                        try:
+                            parent.mkdir()
+                        except FileExistsError:
+                            if not parent.is_dir():
+                                raise
+                        else:
+                            created_dirs.append(parent)
+                    self.files.resolve(item["path"])
                     self.files._write_exclusive(target, item["new_bytes"])
                     done.append({"op": "create", "path": item["path"], "before": None, "after_sha": _sha(item["new_bytes"])})
                 elif item["op"] == "remove":
@@ -182,6 +194,13 @@ class EditTools:
                     self._undo_step(step)
                 except (Conflict, OSError, ValueError):
                     failed.append(step["path"])
+            for directory in reversed(created_dirs):
+                try:
+                    directory.rmdir()  # never recurse: concurrent human files must survive
+                except FileNotFoundError:
+                    pass
+                except OSError:
+                    failed.append(directory.relative_to(self.ws.root).as_posix())
             if failed:
                 return {"status": "NEEDS_RECONCILIATION", "detail": "a batch step failed and rolling back did not fully succeed", "inconsistent_paths": failed, "error": type(exc).__name__}
             return {"status": "CONFLICT", "detail": f"batch not applied (nothing changed): {type(exc).__name__}", "applied": []}

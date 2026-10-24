@@ -12,7 +12,7 @@ import threading
 import re
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
-from .testparse import parse
+from .testparse import parse, verification_status
 
 MAX_OUTPUT = 8000
 PARSE_TAIL = 65536           # kept in memory for reading results; only MAX_OUTPUT characters are returned
@@ -87,6 +87,10 @@ class CommandRunner:
         text = self.scrub(raw.decode("utf-8", "replace").replace("\r\n", "\n"))
         result = {"status": status, "argv": shown, **extra, "output": text[-MAX_OUTPUT:]}
         parsed = parse(text)
+        evidence = verification_status(parsed)
+        result["verification"] = evidence
+        if status == "PASS" and evidence in {"NO_TESTS", "ALL_SKIPPED", "REPORTED_FAILURES"}:
+            result["status"] = "INCONSISTENT" if evidence == "REPORTED_FAILURES" else evidence
         if parsed["runner"] or parsed["failures"] or parsed["diagnostics"]:
             result["parsed"] = parsed
         return result

@@ -1,4 +1,6 @@
-# Host handoff — one page
+# Host handoff — one page (SUPERSEDED)
+
+> **Superseded by `docs/HOST_KIT.md` (host side) and `docs/OPERATOR_GUIDE.md` (service/device side).** Kept for the local prototype only.
 
 > **STATUS: PROTOTYPE / LOCAL-EXPERIMENTAL. NOT the production integration path. Do not hand this page to the receiving host team.**
 > The accepted architecture is ADR-004: a thin, powerless host client, an independent Coding Service and a separate Device Agent.

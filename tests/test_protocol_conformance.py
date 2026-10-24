@@ -11,7 +11,9 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
-from code_attach.protocol_router import make_protocol_router
+import functools
+from code_attach.protocol_router import make_protocol_router as _make_protocol_router
+make_protocol_router = functools.partial(_make_protocol_router, prototype=True)
 from protocol import ERROR_STATUS, PROTOCOL_VERSION, validate_capabilities, validate_error, validate_events_response
 from protocol.schema import validate_event
 from testkit.fixtures import load_cases
@@ -283,7 +285,8 @@ class Conformance:
         self.assertNotIn(str(self.world.root.parent), text)
         self.assertNotIn(str(Path.home()), text)
         activities = [e["data"] for e in body["events"] if e["type"] == "tool_activity"]
-        self.assertEqual([a["status"] for a in activities], ["ERROR"] * 3)
+        self.assertGreaterEqual(len(activities), 3)
+        self.assertEqual({a["status"] for a in activities}, {"ERROR"}, "every hostile request is refused")
 
     def test_default_installation_cannot_mutate_whatever_the_model_asks(self):
         tid = self.world.post_task("approve this").body["task_id"]
@@ -333,7 +336,7 @@ class MockConformance(Conformance, unittest.TestCase):
         "test_default_installation_cannot_mutate_whatever_the_model_asks": "the mock has no tools or model; it never mutates by construction",
         "test_experimental_mutation_yields_a_receipt_only_after_approval": "the mock never mutates by construction",
         "test_a_stale_file_at_decision_time_is_reported_not_overwritten": "the mock never mutates by construction",
-        "test_service_absent_is_reported_by_the_client_without_breaking_chat": "needs the host client package (migration phase 3); the service cannot observe its own absence",
+        "test_service_absent_is_reported_by_the_client_without_breaking_chat": "a service cannot observe its own absence; covered at the client layer by tests/test_host_client.py and tests/test_sample_host.py",
     }
 
 class RealReadProposeConformance(Conformance, unittest.TestCase):
@@ -343,15 +346,93 @@ class RealReadProposeConformance(Conformance, unittest.TestCase):
         "test_approval_card_decision_flow_and_wrong_fingerprint": "no approval cards exist in read/propose mode (covered by the experimental world)",
         "test_cancel_is_idempotent_and_a_terminal_state_never_changes": "needs a task that waits for approval; not reachable in read/propose mode",
         "test_a_stale_file_at_decision_time_is_reported_not_overwritten": "no decision stage exists in read/propose mode (covered by the experimental world)",
-        "test_service_absent_is_reported_by_the_client_without_breaking_chat": "needs the host client package (migration phase 3); the service cannot observe its own absence",
+        "test_service_absent_is_reported_by_the_client_without_breaking_chat": "a service cannot observe its own absence; covered at the client layer by tests/test_host_client.py and tests/test_sample_host.py",
     }
 
 class RealExperimentalConformance(Conformance, unittest.TestCase):
     build = staticmethod(lambda: real_world(True))
     unsupported = {
         "test_default_installation_cannot_mutate_whatever_the_model_asks": "this world enables mutation on purpose",
-        "test_service_absent_is_reported_by_the_client_without_breaking_chat": "needs the host client package (migration phase 3); the service cannot observe its own absence",
+        "test_service_absent_is_reported_by_the_client_without_breaking_chat": "a service cannot observe its own absence; covered at the client layer by tests/test_host_client.py and tests/test_sample_host.py",
     }
+
+# --- the durable service as real separate processes (device + service), driven over real HTTP ---------------------------------
+try:
+    from stack_harness import Stack
+except ImportError:
+    from tests.stack_harness import Stack
+import urllib.error
+import urllib.parse
+import urllib.request
+
+from testkit.transport import Response
+
+class UrllibTransport:
+    name = "stack"
+
+    def __init__(self, base):
+        self.base = base
+
+    def request(self, method, path, headers=None, json_body=None, raw=None):
+        data, hdrs = None, dict(headers or {})
+        if raw is not None:
+            data, hdrs["content-type"] = raw, "application/json"
+        elif json_body is not None:
+            data, hdrs["content-type"] = json.dumps(json_body).encode("utf-8"), "application/json"
+        request = urllib.request.Request(self.base + urllib.parse.quote(path, safe="/%?=&:@"), data=data, method=method, headers=hdrs)
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                status, body = response.status, response.read()
+        except urllib.error.HTTPError as error:
+            status, body = error.code, error.read()
+        try:
+            return Response(status, json.loads(body))
+        except ValueError:
+            return Response(status, {"_non_json": body[:200].decode("utf-8", "replace")})
+
+class _ClassOwner:
+    def __init__(self, cls):
+        self.addCleanup = cls.addClassCleanup
+
+def stack_world(stack):
+    world = World(UrllibTransport(stack.service_url), stack.project, can_mutate=stack.allow_mutation)
+    world.alice = {"authorization": "Bearer " + stack.credentials["chat-a"], "x-principal": "alice"}
+    world.bob = {"authorization": "Bearer " + stack.credentials["chat-a"], "x-principal": "bob"}
+    world.ws_alice = world.ws_bob = "shop"
+    return world
+
+STACK_NOTES = {
+    "test_workspace_belonging_to_someone_else_is_not_found": "per-user workspace access is the HOST's decision (can_access_workspace); the service grants workspaces to hosts, not to their users",
+    "test_service_absent_is_reported_by_the_client_without_breaking_chat": "a service cannot observe its own absence; covered at the client layer by tests/test_host_client.py and tests/test_sample_host.py",
+}
+
+class StackReadProposeConformance(Conformance, unittest.TestCase):
+    unsupported = {**STACK_NOTES,
+        "test_experimental_mutation_yields_a_receipt_only_after_approval": "mutation is disabled in the default installation (see the experimental stack world)",
+        "test_approval_card_decision_flow_and_wrong_fingerprint": "no approval cards exist in read/propose mode (covered by the experimental stack world)",
+        "test_cancel_is_idempotent_and_a_terminal_state_never_changes": "needs a task that waits for approval; not reachable in read/propose mode",
+        "test_a_stale_file_at_decision_time_is_reported_not_overwritten": "no decision stage exists in read/propose mode (covered by the experimental stack world)"}
+
+    @classmethod
+    def setUpClass(cls):
+        cls.stack = Stack(_ClassOwner(cls)).start()
+
+    def build(self):
+        return stack_world(self.stack), (lambda: None)
+
+class StackExperimentalConformance(Conformance, unittest.TestCase):
+    unsupported = {**STACK_NOTES, "test_default_installation_cannot_mutate_whatever_the_model_asks": "this world enables mutation on purpose"}
+
+    @classmethod
+    def setUpClass(cls):
+        cls.stack = Stack(_ClassOwner(cls), device_caps=("read", "propose", "apply"), experimental=True, allow_mutation=True).start()
+
+    def setUp(self):
+        self.stack.project.joinpath("a.txt").write_bytes(b"alpha" + chr(10).encode())
+        super().setUp()
+
+    def build(self):
+        return stack_world(self.stack), (lambda: None)
 
 if __name__ == "__main__":
     unittest.main()

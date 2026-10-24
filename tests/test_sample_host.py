@@ -12,7 +12,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "packages" / "host_
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
-from code_attach.protocol_router import make_protocol_router
+import functools
+from code_attach.protocol_router import make_protocol_router as _make_protocol_router
+make_protocol_router = functools.partial(_make_protocol_router, prototype=True)
 from examples.sample_host.app import create_app
 from host_client import AgentGateway
 from testkit.mock import MockCodingService

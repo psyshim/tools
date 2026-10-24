@@ -9,10 +9,10 @@ class OperationConflict(Exception):
     pass
 
 class OperationJournal:
-    def __init__(self, filename):
+    def __init__(self, filename, check_same_thread=True):
         location = Path(filename)
         location.parent.mkdir(parents=True, exist_ok=True)
-        self.conn = sqlite3.connect(str(location), timeout=10, isolation_level=None)
+        self.conn = sqlite3.connect(str(location), timeout=10, isolation_level=None, check_same_thread=check_same_thread)
         try:
             self.conn.execute('PRAGMA busy_timeout=10000')
             self.conn.execute('PRAGMA synchronous=FULL')

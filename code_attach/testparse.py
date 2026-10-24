@@ -44,10 +44,12 @@ def diagnostics(text):
     return found
 
 def _unittest(text):
-    if not (re.search(r"^Ran \d+ tests? in ", text, re.M) and re.search(r"^(?:OK|FAILED)\b", text, re.M)):
+    if not (re.search(r"^Ran \d+ tests? in ", text, re.M) and re.search(r"^(?:OK|FAILED|NO TESTS RAN)\b", text, re.M)):
         return None
     summary = {"ran": int(re.search(r"^Ran (\d+) tests? in ", text, re.M).group(1))}
     m = re.search(r"^FAILED \((.*)\)$", text, re.M)
+    if m is None:
+        m = re.search(r"^OK \((.*)\)$", text, re.M)
     for key, value in re.findall(r"(\w+)=(\d+)", m.group(1)) if m else []:
         summary[key] = int(value)
     failures = []
@@ -67,6 +69,8 @@ def _pytest(text):
     if not m and not failed_lines:
         return None
     summary = {}
+    if m and m.group(1) == "no tests ran":
+        summary["ran"] = 0
     for n, label in re.findall(r"(\d+) (passed|failed|errors?|skipped|xfailed|xpassed|deselected|warnings?)", m.group(1) if m else ""):
         summary["error" if label.startswith("error") else label.rstrip("s") if label.startswith("warning") else label] = int(n)
     failures = []
@@ -126,3 +130,23 @@ def parse(output):
             runner, summary, failures = found
             break
     return {"runner": runner, "summary": summary, "failures": failures[:MAX_FAILURES], "diagnostics": diagnostics(text)}
+
+
+def verification_status(parsed):
+    """Conservative evidence qualifiers; process exit remains available separately."""
+    runner, summary = parsed["runner"], parsed["summary"]
+    if not runner:
+        return "COMMAND_EXIT_ONLY"
+    if parsed["failures"] or any(summary.get(k, 0) for k in ("failed", "failures", "error", "errors")):
+        return "REPORTED_FAILURES"
+    total = summary.get("ran", summary.get("run"))
+    if total == 0:
+        return "NO_TESTS"
+    if total is not None and total <= summary.get("skipped", 0):
+        return "ALL_SKIPPED"
+    if runner in {"pytest", "jest"} and not summary.get("passed", 0):
+        if summary.get("skipped", 0) or summary.get("xfailed", 0) or summary.get("todo", 0):
+            return "ALL_SKIPPED"
+    if runner in {"cargo", "dotnet"} and summary.get("passed") == 0:
+        return "NO_TESTS"
+    return "RUNNER_SUMMARY"

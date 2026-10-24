@@ -51,7 +51,7 @@ class VersioningTests(unittest.TestCase):
 
 class BoundaryTests(unittest.TestCase):
     """The public packages must stay powerless: no agent, tool, file, Git, process or model dependencies."""
-    STDLIB_OK = {"json", "re", "threading", "hashlib", "uuid", "urllib", "pathlib", "__future__"}
+    STDLIB_OK = {"json", "re", "threading", "hashlib", "uuid", "urllib", "pathlib", "math", "__future__"}
 
     def imports(self, path):
         tree = ast.parse(path.read_text(encoding="utf-8"))

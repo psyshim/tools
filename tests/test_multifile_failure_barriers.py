@@ -64,6 +64,32 @@ class MultifileFailureBarriers(unittest.TestCase):
         self.assertEqual((self.root / "a.py").read_bytes(), b"value = 1\n")
         self.assertEqual((self.root / "b.py").read_bytes(), b"value = 88 # human\n")
 
+    def test_failed_batch_removes_its_new_parent_directories(self):
+        pid = self.box.t_propose_edits([
+            {"path": "new/deep/file.py", "content": "x = 1\n"},
+            {"path": "b.py", "old": "value = 1", "new": "value = 2"},
+        ])["proposal_id"]
+        with patch.object(self.box.flow, "replace_bytes", side_effect=PermissionError("locked")):
+            result = self.box.t_apply_proposal(pid)
+        self.assertEqual(result["status"], "CONFLICT")
+        self.assertFalse((self.root / "new").exists())
+        self.assertEqual((self.root / "b.py").read_bytes(), b"value = 1\n")
+
+    def test_rollback_does_not_remove_human_files_in_new_directory(self):
+        pid = self.box.t_propose_edits([
+            {"path": "new/file.py", "content": "x = 1\n"},
+            {"path": "b.py", "old": "value = 1", "new": "value = 2"},
+        ])["proposal_id"]
+        def interfere(*_):
+            (self.root / "new/human.txt").write_bytes(b"human")
+            raise PermissionError("locked")
+        with patch.object(self.box.flow, "replace_bytes", side_effect=interfere):
+            result = self.box.t_apply_proposal(pid)
+        self.assertEqual(result["status"], "NEEDS_RECONCILIATION")
+        self.assertIn("new", result["inconsistent_paths"])
+        self.assertEqual((self.root / "new/human.txt").read_bytes(), b"human")
+        self.assertFalse((self.root / "new/file.py").exists())
+
     def test_syntax_success_does_not_prove_reference_rename_complete(self):
         (self.root / "api.py").write_text("def old_name():\n    return 42\n", encoding="utf-8")
         (self.root / "consumer.py").write_text("from api import old_name\nassert old_name() == 42\n", encoding="utf-8")

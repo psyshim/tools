@@ -8,6 +8,7 @@ import threading
 import time
 import uuid
 from .text_encoding import decode_source, encode_source
+from .write_guard import GuardUnavailable, guard, replace_file, run_hook
 
 _LOCK = threading.RLock()
 
@@ -73,18 +74,22 @@ class Workflow:
                 handle.flush()
                 os.fsync(handle.fileno())
             os.chmod(tmp, mode)
-            # Cooperative in-process only: external editor races remain possible.
-            if path.read_bytes() != data:
-                raise Conflict("file changed during edit")
-            for attempt in range(6):
-                try:
-                    os.replace(tmp, path)
-                    break
-                except PermissionError:
-                    # Windows: an editor, indexer or antivirus may hold the target open for a moment. Retry briefly, never loop forever.
-                    if attempt == 5:
-                        raise
-                    time.sleep(0.05 * (attempt + 1))
+            try:
+                with guard(path):   # Windows: other writers are refused (their save fails visibly) from here to the replace
+                    if path.read_bytes() != data:
+                        raise Conflict("file changed during edit")
+                    run_hook("after_check")
+                    for attempt in range(6):
+                        try:
+                            replace_file(tmp, path)
+                            break
+                        except PermissionError:
+                            # An indexer or antivirus may hold the target open for a moment. Retry briefly, never loop forever.
+                            if attempt == 5:
+                                raise
+                            time.sleep(0.05 * (attempt + 1))
+            except GuardUnavailable as exc:
+                raise Conflict("the file is open for writing in another program; nothing was changed. Try again after it is saved or closed") from exc
             tmp = None
         finally:
             if tmp is not None:

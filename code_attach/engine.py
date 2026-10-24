@@ -1,25 +1,15 @@
 """Agent-side facade. Owns task registry, idempotency and ownership. Knows nothing about HTTP or the host's auth."""
 import hashlib
 import threading
-from .session import LogUnavailable, Task, TERMINAL
+from coding_service.wire import to_protocol_events
+from coding_service.errors import BadWorkspace, Busy, KeyConflict, LogUnavailable, NotFound  # noqa: F401  (re-exported)
+from .session import Task, TERMINAL
 from .testrun import normalize_commands
 from .tools import ToolBox
 
 def _ref(value):
     """Opaque stable reference; raw paths and user ids must not appear in events or logs."""
     return hashlib.sha256(str(value).encode("utf-8")).hexdigest()[:12]
-
-class NotFound(Exception):
-    pass
-
-class KeyConflict(Exception):
-    pass
-
-class Busy(Exception):
-    pass
-
-class BadWorkspace(Exception):
-    pass
 
 class Engine:
     """Task registry for one host: start/observe/decide/cancel with per-principal ownership, idempotency keys,
@@ -93,6 +83,12 @@ class Engine:
     def events(self, principal, task_id, after=0):
         events, state = self._own(principal, task_id).events_after(max(after, 0))
         return {"events": events, "state": state, "terminal": state in TERMINAL}
+
+    def protocol_snapshot(self, principal, task_id, after=0):
+        """Events as protocol envelopes (stable ids, see coding_service.wire) for the contract router."""
+        snapshot = self.events(principal, task_id, 0)
+        mapped = to_protocol_events(task_id, snapshot["events"])
+        return {"events": [e for e in mapped if int(e["event_id"]) > after], "state": snapshot["state"], "next_cursor": len(mapped)}
 
     def decide(self, principal, task_id, action_id, fingerprint, approve):
         return self._own(principal, task_id).decide(action_id, fingerprint, approve)

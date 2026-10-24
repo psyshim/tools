@@ -11,7 +11,9 @@ import unittest
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from code_attach import make_router
+import functools
+from code_attach import make_router as _make_router
+make_router = functools.partial(_make_router, prototype=True)
 from code_attach.engine import Engine
 from code_attach.tools import ToolBox
 
@@ -97,6 +99,13 @@ class Posture(unittest.TestCase):
         app.include_router(make_router(lambda m, t: {"text": "", "tool_calls": []}, lambda r: "u", lambda p, w: str(self.root), {"unit": [PY, "-c", "pass"]}, allow_mutation=True))
         got = TestClient(app).get("/availability").json()
         self.assertEqual((got["modes"], got["mutation"]), (["read", "propose", "apply", "test"], True))
+
+    def test_in_process_entrances_refuse_to_mount_without_the_prototype_acknowledgement(self):
+        from code_attach.protocol_router import make_protocol_router
+        for factory in (_make_router, make_protocol_router):
+            with self.assertRaises(RuntimeError) as caught:
+                factory(lambda m, t: {"text": "", "tool_calls": []}, lambda r: "u", lambda p, w: None)
+            self.assertIn("host_client", str(caught.exception))
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,9 +1,9 @@
 """HTTP translation only. Host supplies identity, workspace ACL and the model callback; no tool or execution code here."""
-import json
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, ValidationError
 from starlette.concurrency import run_in_threadpool
 from .engine import BadWorkspace, Busy, Engine, KeyConflict, LogUnavailable, NotFound
+from protocol.json_boundary import loads_object, read_limited_body
 
 MAX_BODY_BYTES = 65536
 
@@ -20,14 +20,11 @@ class Decision(BaseModel):
 async def read_model(request, model):
     """Parse and validate a JSON body ourselves: bounded size, and error responses never echo the input back
     (FastAPI's default 422 echoes it and crashes on lone surrogates, turning bad input into a 500)."""
-    declared = request.headers.get("content-length")
-    if declared and declared.isdigit() and int(declared) > MAX_BODY_BYTES:
-        raise HTTPException(413, "request body too large")
-    raw = await request.body()
-    if len(raw) > MAX_BODY_BYTES:
-        raise HTTPException(413, "request body too large")
     try:
-        data = json.loads(raw)
+        raw = await read_limited_body(request, MAX_BODY_BYTES)
+        data = loads_object(raw, max_bytes=MAX_BODY_BYTES)
+    except OverflowError:
+        raise HTTPException(413, "request body too large") from None
     except (ValueError, RecursionError):
         raise HTTPException(400, "body is not valid JSON")
     try:
@@ -35,11 +32,14 @@ async def read_model(request, model):
     except ValidationError as exc:
         raise HTTPException(422, [{"field": ".".join(str(p) for p in e["loc"]), "problem": e["type"]} for e in exc.errors()])
 
-def make_router(complete, authorize, resolve_workspace, test_commands=None, max_tasks=64, test_timeout=180, event_sink=None, test_env=None, recycle_dir=None, allow_mutation=False):
+def make_router(complete, authorize, resolve_workspace, test_commands=None, max_tasks=64, test_timeout=180, event_sink=None, test_env=None, recycle_dir=None, allow_mutation=False, *, prototype=False):
     """complete(messages, tools) -> {"text", "tool_calls"}; authorize(request) -> principal (raise HTTPException on failure);
     resolve_workspace(principal, workspace_id) -> local directory path or None; test_commands: {name: argv list}.
     allow_mutation=False (the default) is read/propose mode: the assistant returns patch proposals and can neither apply
     them nor run commands. Enabling it is an explicit, local-experimental decision (see docs/UPSTREAM_MIGRATION_PLAYBOOK.md)."""
+    if not prototype:
+        raise RuntimeError("this runs the tools inside the host process and is a local experiment only; production hosts use host_client "
+                           "against the coding service (docs/HOST_KIT.md). Pass prototype=True to acknowledge that.")
     engine = Engine(complete, test_commands, max_tasks, test_timeout, event_sink, test_env, recycle_dir=recycle_dir, allow_mutation=allow_mutation)
     router = APIRouter()
 

@@ -16,7 +16,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 
 from code_attach import make_router
-from code_attach.providers import from_openai, to_openai
+from code_attach.providers import from_openai_response, to_openai
 from code_attach.activity import ActivityLog, default_log_dir, display_path
 
 
@@ -29,7 +29,7 @@ def model_callback(model, api_key, base_url):
             {"Content-Type": "application/json", "Authorization": "Bearer " + api_key},
         )
         with urllib.request.urlopen(request, timeout=120) as response:
-            return from_openai(json.load(response)["choices"][0]["message"])
+            return from_openai_response(response.read(4 * 1024 * 1024 + 1))
     return complete
 
 
@@ -109,7 +109,7 @@ def create_app(workspace, complete, token, test_commands=None, demo=False, log_d
 
     app.include_router(make_router(complete, authorize,
                                   lambda principal, wid: str(root) if wid == "project" else None,
-                                  test_commands, event_sink=activity.record, allow_mutation=True), prefix="/api/code")
+                                  test_commands, event_sink=activity.record, allow_mutation=True, prototype=True), prefix="/api/code")
     return app
 
 

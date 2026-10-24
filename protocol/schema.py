@@ -133,7 +133,11 @@ def validate_event(obj):
     if kind not in EVENT_TYPES:
         raise ProtocolError("VALIDATION_FAILED", f"unknown event type {kind!r}", "type")
     data = _require(obj, "data", (dict,))
-    if len(json.dumps(data, ensure_ascii=False)) > MAX_EVENT_DATA_BYTES:
+    try:
+        data_size = len(json.dumps(data, ensure_ascii=False, allow_nan=False).encode("utf-8"))
+    except (ValueError, TypeError, UnicodeError, RecursionError):
+        raise ProtocolError("VALIDATION_FAILED", "event data is not valid UTF-8 JSON", "data") from None
+    if data_size > MAX_EVENT_DATA_BYTES:
         raise ProtocolError("PAYLOAD_TOO_LARGE", "event data exceeds the size cap", "data")
     for field, expected in _PER_TYPE[kind]:
         _require(data, field, (expected,))

@@ -11,6 +11,7 @@ from pathlib import Path
 import re
 import stat
 import threading
+import tempfile
 import uuid
 
 from .workspace import Workspace
@@ -151,11 +152,23 @@ class FileOperations:
 
     @staticmethod
     def _write_exclusive(target, data, mode=0o600):
-        descriptor = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0), mode)
-        with os.fdopen(descriptor, "wb") as stream:
-            stream.write(data)
-            stream.flush()
-            os.fsync(stream.fileno())
+        # Publish only fully written bytes. Opening the destination with O_EXCL
+        # directly leaves a partial file behind on disk-full/write/fsync errors.
+        descriptor, temporary = tempfile.mkstemp(prefix=".agent-new-", dir=target.parent)
+        try:
+            with os.fdopen(descriptor, "wb") as stream:
+                stream.write(data)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.chmod(temporary, mode)
+            if os.name == "nt":
+                os.rename(temporary, target)  # Windows rename refuses an existing destination
+                temporary = None
+            else:
+                os.link(temporary, target, follow_symlinks=False)  # atomic no-clobber publication
+        finally:
+            if temporary is not None:
+                os.unlink(temporary)
 
     def apply(self, plan):
         with _LOCK:

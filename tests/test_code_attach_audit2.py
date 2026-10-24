@@ -11,7 +11,9 @@ import unittest
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from code_attach import make_router
+import functools
+from code_attach import make_router as _make_router
+make_router = functools.partial(_make_router, prototype=True)
 from code_attach.activity import display_path
 from code_attach.engine import Engine
 from code_attach.session import KEEP_FULL_TOOL_RESULTS, Task
@@ -158,7 +160,9 @@ class BoundedContext(unittest.TestCase):
                 task.messages.append({"role": "tool", "tool_call_id": f"c{i}", "name": "read_file", "content": big})
             view = [m for m in task._model_view() if m["role"] == "tool"]
             self.assertEqual(sum(len(m["content"]) > 1000 for m in view), KEEP_FULL_TOOL_RESULTS)
-            self.assertTrue(view[0]["content"].endswith("[older result shortened]"))
+            shortened = json.loads(view[0]["content"])
+            self.assertTrue(shortened["truncated"])
+            self.assertIn("[older result shortened]", shortened["notice"])
             self.assertEqual(len([m for m in task.messages if m["role"] == "tool" and len(m["content"]) == len(big)]), KEEP_FULL_TOOL_RESULTS + 3)
 
 class LockingAndLogging(unittest.TestCase):
@@ -244,25 +248,25 @@ class TransientLocks(unittest.TestCase):
         tmp, root = project()
         with tmp:
             box = ToolBox(root)
-            real = os.replace
+            real = wf.replace_file
             calls = {"n": 0}
             def flaky(src, dst):
                 calls["n"] += 1
                 if calls["n"] <= 2:
                     raise PermissionError("held open by another process")
                 return real(src, dst)
-            wf.os.replace = flaky
+            wf.replace_file = flaky
             try:
                 pid = box.t_propose_edit("a.txt", "match one", "match 1")["proposal_id"]
                 self.assertEqual(box.t_apply_proposal(pid)["status"], "APPLIED")
                 self.assertEqual(calls["n"], 3)
-                wf.os.replace = lambda src, dst: (_ for _ in ()).throw(PermissionError("locked for good"))
+                wf.replace_file = lambda src, dst: (_ for _ in ()).throw(PermissionError("locked for good"))
                 pid = box.t_propose_edit("a.txt", "match two", "match 2")["proposal_id"]
                 with self.assertRaises(PermissionError):
                     box.t_apply_proposal(pid)
                 self.assertIn(pid, box.proposals, "the proposal stays retryable")
             finally:
-                wf.os.replace = real
+                wf.replace_file = real
             self.assertEqual([p.name for p in root.iterdir() if p.name.startswith(".agent-")], [], "no temp files left behind")
 
 

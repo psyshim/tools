@@ -22,6 +22,7 @@ import urllib.request
 from dataclasses import dataclass
 
 from protocol import (PROTOCOL_VERSION, TERMINAL_STATES, ProtocolError, check_version, validate_capabilities, validate_error, validate_events_response)
+from protocol.json_boundary import loads_object
 
 from .errors import AgentError, AgentUnavailable, ProtocolRefused
 from .events import SafeDisplayEvent, clean_data
@@ -118,7 +119,7 @@ class AgentGateway:
     @staticmethod
     def _parse(status, raw):
         try:
-            body = json.loads(raw)
+            body = loads_object(raw, max_bytes=MAX_RESPONSE_BYTES)
         except (ValueError, RecursionError):
             raise AgentUnavailable("bad_gateway" if status >= 500 else "malformed_response", f"status {status}") from None
         if not isinstance(body, dict):
