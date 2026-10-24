@@ -26,7 +26,7 @@ gateway.cancel_coding(user_id, handle)                                          
 gateway.submit_decision(user_id, handle, action_id, fingerprint, approve)         # optional; only with a reliable approval UI
 ```
 
-`user_id` must be the identity the host verified; `workspace_id` must already have passed the host's own ACL check. Render `SafeDisplayEvent.html_text` (cleaned, bounded and escaped), never raw server fields. Most hosts do not call the gateway directly: subclass `HostEnvironment` (one required method, the workspace ACL), build `CodingEndpoints(gateway, environment)`, and mount `ROUTES` (specification: `docs/HOST_WRAPPER_SPEC.md`; example: `examples/sample_host/app.py`). Check the finished wrapper with `python -m host_client.acceptance`.
+`user_id` must be the identity the host verified; `workspace_id` must already have passed the host's own ACL check. Render `SafeDisplayEvent.html_text` (cleaned, bounded and escaped), never raw server fields. Most hosts do not call the gateway directly: subclass `HostEnvironment` (one required method, the workspace ACL), build `CodingEndpoints(gateway, environment)`, and mount `ROUTES` (specification: `docs/HOST_WRAPPER_SPEC.md`; example: `examples/sample_host/app.py`). Test it in your own CI with `host_client.testing.WrapperContract` (in-process, bundled fake service; template: `tests/test_sample_host_contract.py`) and against the running backend with `python -m host_client.acceptance`.
 
 ## Behaviour you can rely on
 

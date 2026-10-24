@@ -938,7 +938,7 @@
   },
   {
    "id": "R37",
-   "title": "Host wrapper kit: HostEnvironment interface, generic endpoints, spec, and a black-box acceptance tool that fails broken hosts",
+   "title": "Host wrapper kit: HostEnvironment interface, generic endpoints, spec, in-kit test suite and acceptance tool that fail broken hosts",
    "doc": [
     "docs/HOST_WRAPPER_SPEC.md",
     "ルート仕様"
@@ -951,6 +951,10 @@
     [
      "packages/host_client/host_client/acceptance.py",
      "def run"
+    ],
+    [
+     "packages/host_client/host_client/testing.py",
+     "class WrapperContract"
     ]
    ],
    "tests": [
@@ -959,7 +963,10 @@
     "tests.test_host_wrapper.Dispatch.test_input_is_validated_before_anything_else",
     "tests.test_host_wrapper.AcceptanceTool.test_the_sample_host_passes_every_check",
     "tests.test_host_wrapper.AcceptanceTool.test_it_fails_a_host_whose_acl_is_missing",
-    "tests.test_host_wrapper.AcceptanceTool.test_it_fails_a_host_that_leaks_one_users_task_to_another"
+    "tests.test_host_wrapper.AcceptanceTool.test_it_fails_a_host_that_leaks_one_users_task_to_another",
+    "tests.test_sample_host_contract.SuiteCatchesBrokenWrappers.test_each_broken_wrapper_fails_exactly_the_rule_it_breaks",
+    "tests.test_sample_host_contract.SuiteCatchesBrokenWrappers.test_the_unbroken_sample_passes_everything",
+    "tests.test_sample_host_contract.WrapperSuiteShipsInTheKit.test_the_installed_kit_contains_a_working_suite_and_fake_service"
    ],
    "integration": null
   }

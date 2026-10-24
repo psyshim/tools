@@ -18,7 +18,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 NAME, DIST = "code-host-kit", "code_host_kit"
 FIXED_TIME = (2026, 10, 24, 0, 0, 0)
-SOURCES = {"host_client": ROOT / "packages" / "host_client" / "host_client", "protocol": ROOT / "protocol"}
+# `host_client/fake_service` is the executable mock (depends only on `protocol`); `host_client.testing` uses it to give the host a
+# self-contained wrapper test suite. It is single-sourced from testkit/mock, never copied by hand.
+SOURCES = {"host_client": ROOT / "packages" / "host_client" / "host_client", "protocol": ROOT / "protocol",
+           "host_client/fake_service": ROOT / "testkit" / "mock"}
 
 def version():
     text = (SOURCES["host_client"] / "__init__.py").read_text(encoding="utf-8")
