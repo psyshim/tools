@@ -6,7 +6,7 @@ A backend-independent local coding-agent foundation. Initial implementation is r
 
 - Workspace-scoped directory discovery, bounded partial file reads and SHA-256 file hashes
 - Loopback HTTP adapter with bearer authentication
-- No file mutation, shell execution, Git commits, relay or AI model integration yet
+- The HTTP service exposes no file mutation, shell execution, Git commits, relay or AI model integration. `workflow.py` and `patching.py` contain write helpers that are not reachable from the service and remain private prototypes
 
 ## Local run
 
