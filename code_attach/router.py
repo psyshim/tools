@@ -1,7 +1,7 @@
 """HTTP translation only. Host supplies identity, workspace ACL and the model callback; no tool or execution code here."""
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
-from .engine import Busy, Engine, KeyConflict, NotFound
+from .engine import BadWorkspace, Busy, Engine, KeyConflict, NotFound
 
 class NewTask(BaseModel):
     workspace_id: str = Field(min_length=1, max_length=128)
@@ -13,10 +13,10 @@ class Decision(BaseModel):
     fingerprint: str
     approve: bool
 
-def make_router(complete, authorize, resolve_workspace, test_commands=None, max_tasks=64, test_timeout=180, event_sink=None):
+def make_router(complete, authorize, resolve_workspace, test_commands=None, max_tasks=64, test_timeout=180, event_sink=None, test_env=None):
     """complete(messages, tools) -> {"text", "tool_calls"}; authorize(request) -> principal (raise HTTPException on failure);
     resolve_workspace(principal, workspace_id) -> local directory path or None; test_commands: {name: argv list}."""
-    engine = Engine(complete, test_commands, max_tasks, test_timeout, event_sink)
+    engine = Engine(complete, test_commands, max_tasks, test_timeout, event_sink, test_env)
     router = APIRouter()
 
     def guarded(fn, *args):
@@ -44,6 +44,8 @@ def make_router(complete, authorize, resolve_workspace, test_commands=None, max_
             raise HTTPException(409, "idempotency key reused with different content")
         except Busy:
             raise HTTPException(429, "too many tasks")
+        except BadWorkspace:
+            raise HTTPException(404, "workspace not found")
         except OSError:
             raise HTTPException(503, "activity log unavailable")
         return {"task_id": task_id, "state": state}

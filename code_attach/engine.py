@@ -17,12 +17,17 @@ class KeyConflict(Exception):
 class Busy(Exception):
     pass
 
+class BadWorkspace(Exception):
+    pass
+
 class Engine:
-    def __init__(self, complete, test_commands=None, max_tasks=64, test_timeout=180, event_sink=None):
+    def __init__(self, complete, test_commands=None, max_tasks=64, test_timeout=180, event_sink=None, test_env=None, keep_finished=256):
         self._complete = complete
         self._tests = dict(test_commands or {})
         self._max = max_tasks
         self._timeout = test_timeout
+        self._test_env = test_env
+        self._keep = keep_finished
         self._event_sink = event_sink
         self._tasks, self._keys, self._content = {}, {}, {}
         self._lock = threading.Lock()
@@ -40,14 +45,26 @@ class Engine:
                 if self._content[task.id] != content:
                     raise KeyConflict()
                 return task.id, task.state
-            if len(self._tasks) >= self._max:
+            self._evict_finished()
+            if sum(t.state not in TERMINAL for t in self._tasks.values()) >= self._max:
                 raise Busy()
-            task = Task(principal, ToolBox(root, self._tests, self._timeout), self._complete, instruction,
-                        event_sink=self._event_sink)
+            try:
+                toolbox = ToolBox(root, self._tests, self._timeout, self._test_env)
+            except (OSError, ValueError):
+                raise BadWorkspace()
+            task = Task(principal, toolbox, self._complete, instruction, event_sink=self._event_sink)
             task.emit("task_started", {"instruction": instruction, "workspace_ref": _ref(root), "principal_ref": _ref(principal)}, private=True)
             self._tasks[task.id], self._keys[key], self._content[task.id] = task, task.id, content
         task.start()
         return task.id, task.state
+
+    def _evict_finished(self):
+        """Keep memory bounded: drop the oldest finished tasks (their idempotency keys go with them)."""
+        finished = [tid for tid, t in self._tasks.items() if t.state in TERMINAL]
+        for tid in finished[:max(len(finished) - self._keep, 0)]:
+            del self._tasks[tid], self._content[tid]
+            for key in [k for k, v in self._keys.items() if v == tid]:
+                del self._keys[key]
 
     def _own(self, principal, task_id):
         task = self._tasks.get(task_id)

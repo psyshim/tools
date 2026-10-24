@@ -442,6 +442,34 @@
     "tests.test_code_attach_privacy.PrivacyTests.test_oserror_text_is_scrubbed"
    ],
    "integration": null
+  },
+  {
+   "id": "R24",
+   "title": "Audit fixes: concurrent task cap, clean test env, tree-kill timeout, bad workspace 404, glob **",
+   "doc": [
+    "docs/AUDIT_2026-10-24.md",
+    "FIXED"
+   ],
+   "code": [
+    [
+     "code_attach/tools.py",
+     "SAFE_ENV"
+    ],
+    [
+     "code_attach/engine.py",
+     "def _evict_finished"
+    ]
+   ],
+   "tests": [
+    "tests.test_code_attach_audit.TaskCapacity.test_finished_tasks_do_not_consume_capacity",
+    "tests.test_code_attach_audit.TaskCapacity.test_concurrently_active_tasks_are_still_capped",
+    "tests.test_code_attach_audit.TestRunHardening.test_host_secrets_are_not_passed_to_test_commands",
+    "tests.test_code_attach_audit.TestRunHardening.test_timeout_kills_the_process_tree_and_returns_promptly",
+    "tests.test_code_attach_audit.ScrubForms.test_repr_escaped_lowercase_and_posix_spellings_are_scrubbed",
+    "tests.test_code_attach_audit.GlobSemantics.test_double_star_matches_zero_or_more_directories",
+    "tests.test_code_attach_audit.TaskCapacity.test_missing_workspace_is_a_typed_error"
+   ],
+   "integration": null
   }
  ],
  "deferred": [

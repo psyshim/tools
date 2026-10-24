@@ -41,7 +41,7 @@ app.include_router(
     prefix="/api/code")
 ```
 
-- `test_commands`: name -> fixed argv, run with the project folder as working directory. The **model chooses only the name**; you choose the argv. The tool must be installed in the backend's environment. Omit to disable testing.
+- `test_commands`: name -> fixed argv, run with the project folder as working directory. The **model chooses only the name**; you choose the argv. The tool must be installed in the backend's environment. Omit to disable testing. Test commands run with a **filtered environment** (PATH, temp/home, locale and similar only; host secrets such as API keys are not passed). Pass `test_env={"NAME": "value"}` to `make_router` for variables the tests really need.
 - Optional `event_sink=ActivityLog(dir).record` for persistent logs: see `docs/ATTACH_V0.md` (logging).
 - If your app module defines `authorize`'s dependencies and also mounts the router, import them lazily inside the three functions (avoids a circular import).
 - The backend must run on the machine that holds the projects. Never expose the prefix to unauthenticated users.
@@ -78,4 +78,4 @@ The attachment's own tests live in the source repository (`tests/test_code_attac
 
 ## 6. Known limits (do not paper over)
 
-Tasks are in memory (a restart drops live tasks; activity logs persist only if enabled). No delete/rename/Git. Text search only. Approved test commands run project code with the backend's privileges. Real-model behaviour is not measured yet (`kpi/REPORT.md` in the source repository). Privacy: absolute paths, the home directory and the OS user name never leave the process (they are replaced by `<workspace>`, `~`, `<user>` in tool output, errors and test output; the activity log stores only opaque hashes of workspace and user id). Your own `authorize` user id and `test_commands` argv are yours: do not put personal data in them.
+Tasks are in memory (a restart drops live tasks; activity logs persist only if enabled); at most `max_tasks` (64) run at once and 256 finished tasks are kept. A `resolve_workspace` path that does not exist yields 404. Files that are not UTF-8 (for example Shift-JIS) cannot be read or edited yet. See `docs/AUDIT_2026-10-24.md`. No delete/rename/Git. Text search only. Approved test commands run project code with the backend's privileges. Real-model behaviour is not measured yet (`kpi/REPORT.md` in the source repository). Privacy: absolute paths, the home directory and the OS user name never leave the process (they are replaced by `<workspace>`, `~`, `<user>` in tool output, errors and test output; the activity log stores only opaque hashes of workspace and user id). Your own `authorize` user id and `test_commands` argv are yours: do not put personal data in them.

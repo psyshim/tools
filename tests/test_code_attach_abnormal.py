@@ -252,10 +252,14 @@ class OwnershipAbnormal(Case):
         self.assertEqual(h.engine.start("alice", h.root, "k", "do it")[0], h.id)
         with self.assertRaises(KeyConflict):
             h.engine.start("alice", h.root, "k", "different")
-        small = Engine(model(), max_tasks=1)
-        small.start("a", h.root, "1", "x")
+        import threading
+        gate = threading.Event()  # capacity counts ACTIVE tasks, so the first one must still be running
+        small = Engine(lambda messages, tools: (gate.wait(10), {"text": "", "tool_calls": []})[1], max_tasks=1)
+        first, _ = small.start("a", h.root, "1", "x")
         with self.assertRaises(Busy):
             small.start("a", h.root, "2", "x")
+        gate.set()
+        small.join("a", first)
 
 if __name__ == "__main__":
     unittest.main()
