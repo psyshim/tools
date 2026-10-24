@@ -1,7 +1,9 @@
 """Cross-process single-executor regression."""
 import multiprocessing
+import os
 import tempfile
 import unittest
+from unittest import mock
 from coding_agent.execution_owner import SingleExecutor, OwnerBusy
 
 def contender(root, channel):
@@ -13,7 +15,8 @@ def contender(root, channel):
 
 class SingleExecutorTests(unittest.TestCase):
     def test_second_process_is_rejected_then_can_restart(self):
-        with tempfile.TemporaryDirectory() as root:
+        with tempfile.TemporaryDirectory() as state, tempfile.TemporaryDirectory() as root, \
+                mock.patch.dict(os.environ, {"CODING_AGENT_STATE_DIR": state}):
             ctx = multiprocessing.get_context("spawn")
             with SingleExecutor(root):
                 queue = ctx.Queue()
@@ -24,6 +27,13 @@ class SingleExecutorTests(unittest.TestCase):
                 self.assertEqual(queue.get(timeout=1), "busy")
             with SingleExecutor(root):
                 pass
+
+    def test_lock_file_is_never_created_inside_workspace(self):
+        with tempfile.TemporaryDirectory() as state, tempfile.TemporaryDirectory() as root, \
+                mock.patch.dict(os.environ, {"CODING_AGENT_STATE_DIR": state}):
+            with SingleExecutor(root):
+                self.assertEqual(os.listdir(root), [])
+                self.assertTrue(os.listdir(state))
 
 if __name__ == "__main__":
     unittest.main()

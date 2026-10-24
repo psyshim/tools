@@ -1,16 +1,36 @@
-"""One local executor per workspace. Not a multi-writer task scheduler."""
+"""One local executor per workspace. Not a multi-writer task scheduler.
+
+The lock file lives in a private state directory outside the workspace, keyed by
+a hash of the canonical root path. It is never created inside the enrolled tree
+(ADR-001: app-private state outside the worktree).
+
+State directory: $CODING_AGENT_STATE_DIR, else ~/.coding-agent/locks.
+"""
+import hashlib
 import os
 from pathlib import Path
 
 class OwnerBusy(RuntimeError):
     pass
 
+def _state_dir():
+    configured = os.environ.get("CODING_AGENT_STATE_DIR")
+    base = Path(configured) if configured else Path.home() / ".coding-agent" / "locks"
+    base.mkdir(parents=True, exist_ok=True)
+    if os.name != "nt":
+        os.chmod(base, 0o700)
+    return base
+
+def lock_path_for(root):
+    digest = hashlib.sha256(str(Path(root).resolve(strict=True)).encode("utf-8")).hexdigest()
+    return _state_dir() / f"{digest}.lock"
+
 class SingleExecutor:
     def __init__(self, workspace):
         root = Path(workspace).resolve(strict=True)
         if not root.is_dir():
             raise ValueError("workspace must be a directory")
-        self._file = open(root / ".coding-agent-owner.lock", "a+b")
+        self._file = open(lock_path_for(root), "a+b")
         try:
             self._file.seek(0)
             self._file.write(b"\x00")
