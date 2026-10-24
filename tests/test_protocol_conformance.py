@@ -6,6 +6,7 @@ import json
 import tempfile
 import time
 import unittest
+import uuid
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -48,7 +49,7 @@ class World:
         self.ws_alice, self.ws_bob = "w-alice", "w-bob"
 
     def post_task(self, text, headers=None, key=None, workspace=None, **extra):
-        body = {"workspace_id": workspace or self.ws_alice, "instruction": text, "idempotency_key": key or f"k-{time.time_ns()}", **extra}
+        body = {"workspace_id": workspace or self.ws_alice, "instruction": text, "idempotency_key": key or f"k-{uuid.uuid4().hex}", **extra}
         return self.t.request("POST", "/tasks", headers or self.alice, json_body=body)
 
     def events(self, task_id, after=0, headers=None):

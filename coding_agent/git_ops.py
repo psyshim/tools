@@ -12,6 +12,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 from .file_ops import FileOperations
+from .path_spellings import spellings
 
 _INSPECT_ACTIONS = frozenset({"status", "diff", "staged_diff", "log", "branches"})
 _MAX_OUTPUT = 512 * 1024          # 512 KiB per git command
@@ -27,8 +28,7 @@ def _scrub(text: str, root: Path) -> str:
         return str(text)
     home = Path.home()
     for base, label in ((root, "<workspace>"), (home, "~")):
-        variants = {str(base), base.as_posix(), str(base).replace(_BS, _BS + _BS)}
-        pattern = "|".join(re.escape(v) for v in sorted(variants, key=len, reverse=True))
+        pattern = "|".join(re.escape(v) for v in spellings(base))
         text = re.sub(pattern, label, text, flags=re.IGNORECASE)
     try:
         user = getpass.getuser()
