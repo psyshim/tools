@@ -8,7 +8,7 @@ import urllib.request
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
-from coding_agent.mock_backend import handler_factory as mock_handler
+from host_mock.server import handler_factory as mock_handler
 from coding_agent.service import handler_factory as local_handler
 from coding_agent.workspace import Workspace
 
