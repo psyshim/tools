@@ -13,6 +13,7 @@ class ScenarioStore:
         self.tasks = {}
         self.keys = {}
         self.calls = 0
+        self.drop_seen = set()
         self.configure("normal")
 
     def configure(self, scenario):
@@ -26,6 +27,7 @@ class ScenarioStore:
             self.tasks.clear()
             self.keys.clear()
             self.calls = 0
+            self.drop_seen.clear()
 
 def handler_factory(token, control_token, store=None, actor_tokens=None):
     if not token or not control_token or token == control_token:
@@ -103,8 +105,10 @@ def handler_factory(token, control_token, store=None, actor_tokens=None):
                         {"id":"1", "task_id":task_id, "type":"task.started", "payload":{}},
                         {"id":"2", "task_id":task_id, "type":"task.failed" if outcome == "FAILED" else "task.completed", "payload":{"status":outcome}}
                     ]}
-                scenario = state.scenario
-            if scenario == "drop_after_create" and state.calls == 1:
+                drop = state.scenario == "drop_after_create" and scoped_key not in state.drop_seen
+                if drop:
+                    state.drop_seen.add(scoped_key)
+            if drop:
                 self.close_connection = True
                 return
             return self.send(202, {"task_id":task_id, "state":"QUEUED", "event_cursor":"0"})
