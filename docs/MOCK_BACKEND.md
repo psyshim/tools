@@ -16,7 +16,7 @@ Terminal B:
 ```sh
 export CODING_AGENT_TOKEN='agent-secret-change-me'
 export MOCK_HOST_TOKEN='host-secret-change-me'
-python -m coding_agent.mock_backend --agent-url http://127.0.0.1:8765 --port 8766
+python -m host_mock.server --agent-url http://127.0.0.1:8765 --port 8766
 ```
 
 On Windows PowerShell use `$env:CODING_AGENT_TOKEN='...'` and `$env:MOCK_HOST_TOKEN='...'`.
