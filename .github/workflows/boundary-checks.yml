@@ -1,4 +1,4 @@
-name: Focused boundary checks
+name: Python regression suite
 on:
   push:
     branches: [main]
@@ -6,27 +6,24 @@ on:
 permissions:
   contents: read
 jobs:
-  boundaries:
+  python-tests:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.12']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-      - name: Install attach test dependencies
+          python-version: ${{ matrix.python-version }}
+      - name: Install attachment test dependencies
         run: python -m pip install fastapi httpx pyflakes
-      - name: Boundary and mock regressions
-        run: |
-          python -m unittest discover -s tests -p 'test_security_boundary_regression.py' -v
-          python -m unittest discover -s tests -p 'test_mock_actor_isolation.py' -v
-          python -m unittest discover -s tests -p 'test_fault_service.py' -v
-          python -m unittest discover -s tests -p 'test_adversarial_recovery.py' -v
-          python -m unittest discover -s tests -p 'test_architecture_boundaries.py' -v
-          python -m unittest discover -s tests -p 'test_journal.py' -v
-          python -m unittest discover -s tests -p 'test_journaled_edit.py' -v
-          python -m unittest discover -s tests -p 'test_code_attach*.py' -v
-          python -m unittest discover -s tests -p 'test_kpi.py' -v
+      - name: Compile all Python modules
+        run: python -m compileall -q coding_agent host_mock code_attach kpi examples tests
+      - name: Run entire test suite, including newly added tests
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
   adversarial:
     strategy:
       fail-fast: false
