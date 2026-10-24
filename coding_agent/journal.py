@@ -37,6 +37,23 @@ class OperationJournal:
             self.conn.execute('ROLLBACK')
             raise
 
+    def claim(self, operation_id):
+        """Atomically claim a prepared effect before running it, once globally.
+
+        UNKNOWN means claimed or possibly applied; no automatic retry.
+        """
+        self.conn.execute('BEGIN IMMEDIATE')
+        try:
+            cursor = self.conn.execute(
+                "UPDATE operations SET state='UNKNOWN' WHERE id=? AND state='PREPARED'",
+                (operation_id,))
+            won = cursor.rowcount == 1
+            self.conn.execute('COMMIT')
+            return won
+        except BaseException:
+            self.conn.execute('ROLLBACK')
+            raise
+
     def mark_uncertain(self, operation_id):
         self.conn.execute('BEGIN IMMEDIATE')
         try:
