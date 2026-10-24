@@ -27,10 +27,15 @@ class ScenarioStore:
             self.keys.clear()
             self.calls = 0
 
-def handler_factory(token, control_token, store=None):
+def handler_factory(token, control_token, store=None, actor_tokens=None):
     if not token or not control_token or token == control_token:
         raise ValueError("distinct tokens required")
     state = store or ScenarioStore()
+    actors = actor_tokens if actor_tokens is not None else {token: "single-test-actor"}
+    if not isinstance(actors, dict) or not actors or any(not isinstance(k, str) or not k or not isinstance(v, str) or not v for k, v in actors.items()):
+        raise ValueError("invalid actor token mapping")
+    if control_token in actors:
+        raise ValueError("control token must be isolated")
     class Handler(BaseHTTPRequestHandler):
         def send(self, code, obj):
             data = json.dumps(obj, sort_keys=True).encode()
@@ -66,7 +71,8 @@ def handler_factory(token, control_token, store=None):
                 except (KeyError, TypeError, ValueError):
                     return self.send(400, {"error":"invalid_scenario"})
                 return self.send(200, {"scenario":scenario})
-            if not self.auth(token):
+            actor = next((name for secret, name in actors.items() if self.auth(secret)), None)
+            if actor is None:
                 return self.send(401, {"error":"unauthorized"})
             if self.path != "/v1/tasks":
                 return self.send(404, {"error":"not_found"})
@@ -84,15 +90,16 @@ def handler_factory(token, control_token, store=None):
                 return self.send(400, {"error":"invalid_request"})
             with state.lock:
                 state.calls += 1
-                if key in state.keys:
-                    old_digest, task_id = state.keys[key]
+                scoped_key = (actor, key)
+                if scoped_key in state.keys:
+                    old_digest, task_id = state.keys[scoped_key]
                     if old_digest != digest:
                         return self.send(409, {"error":"idempotency_conflict"})
                 else:
                     task_id = "mock-" + str(uuid.uuid4())
-                    state.keys[key] = (digest, task_id)
+                    state.keys[scoped_key] = (digest, task_id)
                     outcome = "FAILED" if state.scenario == "fail_task" else "COMPLETED"
-                    state.tasks[task_id] = {"task_id":task_id, "state":outcome, "event_cursor":"2", "events":[
+                    state.tasks[task_id] = {"task_id":task_id, "owner":actor, "workspace_id":obj["workspace_id"], "state":outcome, "event_cursor":"2", "events":[
                         {"id":"1", "task_id":task_id, "type":"task.started", "payload":{}},
                         {"id":"2", "task_id":task_id, "type":"task.failed" if outcome == "FAILED" else "task.completed", "payload":{"status":outcome}}
                     ]}
@@ -114,7 +121,7 @@ def handler_factory(token, control_token, store=None):
             with state.lock:
                 task = state.tasks.get(parts[2])
                 scenario = state.scenario
-            if task is None:
+            if task is None or task["owner"] != actor:
                 return self.send(404, {"error":"not_found"})
             if len(parts) == 3:
                 return self.send(200, {k:task[k] for k in ("task_id","state","event_cursor")})
