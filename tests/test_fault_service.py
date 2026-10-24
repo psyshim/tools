@@ -32,7 +32,7 @@ class ContractFaultTests(unittest.TestCase):
             return error.code,json.load(error)
 
     def setUp(self):
-        self.assertEqual(self.call("/__test/scenario",{"scenario":"normal"},token="control-token")[0],200)
+        self.assertEqual(self.call("/__test/scenario",{"scenario":"normal","reset":True},token="control-token")[0],200)
         self.task = {"protocol":"1.0","mode":"read","workspace_id":"w1","instruction":"inspect"}
 
     def test_auth_and_control_isolation(self):
