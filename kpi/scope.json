@@ -997,6 +997,30 @@
     "tests.test_path_spellings.Spellings.test_the_usual_forms_are_all_covered"
    ],
    "integration": null
+  },
+  {
+   "id": "R39",
+   "title": "Speed and weight are requirements with budgets: measured identically each time, judged loosely, recorded in the delivery receipt",
+   "doc": [
+    "docs/DELIVERY_POLICY.md",
+    "速度・軽快さの予算"
+   ],
+   "code": [
+    [
+     "hostkit_build/perf.py",
+     "def evaluate"
+    ],
+    [
+     "hostkit_build/perf_budgets.json",
+     "limits"
+    ]
+   ],
+   "tests": [
+    "tests.test_perf_budgets.Budgets.test_the_evaluator_flags_a_breach_and_a_missing_measurement",
+    "tests.test_perf_budgets.Budgets.test_every_limit_is_a_positive_number_with_a_unit_in_its_name",
+    "tests.test_perf_budgets.CheapMeasurements.test_the_kit_is_light_and_the_wrapper_adds_almost_nothing"
+   ],
+   "integration": null
   }
  ],
  "deferred": [

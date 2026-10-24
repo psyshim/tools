@@ -41,7 +41,7 @@ class GateSaysNo(unittest.TestCase):
     def test_the_undamaged_copy_passes_everything_that_does_not_need_git_or_the_full_suite(self):
         code, checks, receipt = gate()
         failed = {name for name, c in checks.items() if c["outcome"] == "FAIL"}
-        self.assertEqual(failed, {"the working tree is clean and the revision is known", "the complete test suite"}, failed)
+        self.assertEqual(failed, {"the working tree is clean and the revision is known", "the complete test suite", "speed and weight are within the budgets"}, failed)
         self.assertEqual(code, 1, "no revision and no full run: never deliverable")
         self.assertTrue(receipt["host_kit_sha256"])
         self.assertTrue(receipt["not_covered"], "the receipt must say what it does not cover")

@@ -192,6 +192,17 @@ def main(argv=None):
         assert not missing, "; ".join(missing[:8])
 
     if args.full:
+        @check("speed and weight are within the budgets")
+        def _():
+            from hostkit_build import perf
+            state["performance"] = perf.measure(include_stack=True)
+            over = perf.evaluate(state["performance"])
+            assert not over, "over budget: " + "; ".join(f"{n} = {v} (limit {limit})" for n, v, limit in over)
+    else:
+        RESULTS.append({"check": "speed and weight are within the budgets", "outcome": "FAIL", "detail": "not measured (--full is required for a delivery)", "seconds": 0})
+        print("FAIL speed and weight are within the budgets  -- not measured (--full is required for a delivery)", flush=True)
+
+    if args.full:
         heavy, rest = test_groups()
         started = time.time()
         with ThreadPoolExecutor(2) as pool:
@@ -199,6 +210,11 @@ def main(argv=None):
         total = sum(o["ran"] for o in outcomes)
         failures = [f for o in outcomes for f in o["failures"]]
         bad = [o for o in outcomes if o["returncode"] != 0 or o["ran"] == 0]
+        from hostkit_build import perf
+        minutes = (time.time() - started) / 60
+        state["suite_minutes"] = round(minutes, 1)
+        if not bad and minutes > perf.BUDGETS["suite_wall_minutes"]:
+            bad = [{"tail": f"the suite took {minutes:.0f} min; budget {perf.BUDGETS['suite_wall_minutes']} min"}]
         RESULTS.append({"check": "the complete test suite", "outcome": "FAIL" if bad else "PASS", "seconds": round(time.time() - started, 1),
                         "detail": (f"failures: {failures[:10]}; {bad[0]['tail']}" if bad else f"{total} tests in {len(heavy) + len(rest)} modules")})
         print(f"{RESULTS[-1]['outcome']:4} the complete test suite  -- {RESULTS[-1]['detail'][:300]}", flush=True)
@@ -210,7 +226,7 @@ def main(argv=None):
     receipt = {"delivery_ok": passed and not state.get("dirty"), "revision": state.get("revision"), "branch": state.get("branch"), "tree_dirty": state.get("dirty"),
                "host_kit_sha256": state.get("kit_sha256"), "python": platform.python_version(), "platform": platform.platform(),
                "generated": datetime.now(timezone.utc).isoformat(timespec="seconds"), "command": "python -m hostkit_build.release_gate --full",
-               "checks": RESULTS, "not_covered": NOT_COVERED}
+               "performance": state.get("performance"), "suite_minutes": state.get("suite_minutes"), "checks": RESULTS, "not_covered": NOT_COVERED}
     Path(args.output).write_text(json.dumps(receipt, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"{'DELIVERABLE' if receipt['delivery_ok'] else 'NOT DELIVERABLE'}: revision {str(state.get('revision'))[:10]}, receipt {args.output}")
     return 0 if receipt["delivery_ok"] else 1
