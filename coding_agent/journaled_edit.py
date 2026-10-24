@@ -25,8 +25,9 @@ class JournaledEdit:
                 return recorded["result"]
             if recorded["state"] != "PREPARED":
                 raise OperationConflict("operation not safely replayable; reconciliation required")
-            # Journal the uncertain state durably before touching the file.
-            self.journal.mark_uncertain(operation_id)
+            # Only one process may claim the effect; UNKNOWN remains fail-closed.
+            if not self.journal.claim(operation_id):
+                raise OperationConflict("operation already claimed")
             try:
                 result = self.workflow.replace_text(relative, expected_sha256, original, replacement)
             except (Conflict, ValueError, UnicodeError) as exc:
