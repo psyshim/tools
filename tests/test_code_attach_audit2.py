@@ -237,5 +237,34 @@ class PathDisplay(unittest.TestCase):
         self.assertIn("from code_attach.activity import", source)
         self.assertNotIn("from coding_agent", source)
 
+class TransientLocks(unittest.TestCase):
+    def test_a_briefly_locked_target_is_retried_but_a_permanent_lock_still_fails(self):
+        import os
+        import coding_agent.workflow as wf
+        tmp, root = project()
+        with tmp:
+            box = ToolBox(root)
+            real = os.replace
+            calls = {"n": 0}
+            def flaky(src, dst):
+                calls["n"] += 1
+                if calls["n"] <= 2:
+                    raise PermissionError("held open by another process")
+                return real(src, dst)
+            wf.os.replace = flaky
+            try:
+                pid = box.t_propose_edit("a.txt", "match one", "match 1")["proposal_id"]
+                self.assertEqual(box.t_apply_proposal(pid)["status"], "APPLIED")
+                self.assertEqual(calls["n"], 3)
+                wf.os.replace = lambda src, dst: (_ for _ in ()).throw(PermissionError("locked for good"))
+                pid = box.t_propose_edit("a.txt", "match two", "match 2")["proposal_id"]
+                with self.assertRaises(PermissionError):
+                    box.t_apply_proposal(pid)
+                self.assertIn(pid, box.proposals, "the proposal stays retryable")
+            finally:
+                wf.os.replace = real
+            self.assertEqual([p.name for p in root.iterdir() if p.name.startswith(".agent-")], [], "no temp files left behind")
+
+
 if __name__ == "__main__":
     unittest.main()

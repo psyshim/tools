@@ -21,9 +21,18 @@ jobs:
       - name: Install attachment test dependencies
         run: python -m pip install fastapi httpx pyflakes
       - name: Compile all Python modules
-        run: python -m compileall -q coding_agent host_mock code_attach kpi examples tests
+        run: python -m compileall -q coding_agent host_mock code_attach protocol testkit kpi examples tests
       - name: Run entire test suite, including newly added tests
         run: python -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Record contract and conformance evidence for this exact revision
+        if: always()
+        run: python -m examples.conformance_evidence --output conformance-evidence.json
+      - name: Preserve conformance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: conformance-${{ matrix.python-version }}
+          path: conformance-evidence.json
   adversarial:
     strategy:
       fail-fast: false

@@ -7,6 +7,8 @@
 | `router.py` | host-facing | HTTP translation, error -> status mapping | execute anything, import tools/session, touch files |
 | `providers.py` | host-facing | neutral message <-> OpenAI/Anthropic shapes | call a model |
 | `activity.py` | agent (re-export) | `ActivityLog`, `default_log_dir`, `display_path` for the host | add logic |
+| `wire.py` | host-facing | pure mapping of internal events to protocol envelopes (stable ids) | import tools/session or do I/O |
+| `protocol_router.py` | host-facing | the contract-shaped HTTP surface over `Engine` (envelopes, stable error codes, cursor, version check) | execute anything; return anything that does not validate against `protocol` |
 | `engine.py` | agent | task registry, idempotency, ownership, capacity/eviction | know HTTP or auth |
 | `session.py` | agent | the model/tool loop, approval state machine, event list, cancel | do I/O besides the sink |
 | `schemas.py` | agent | tool schemas, `EFFECT_TOOLS` | hold behavior |
@@ -53,6 +55,10 @@ python -m pyflakes code_attach                                      # also enfor
 ```
 
 Known environment traps (Windows): creating symlinks needs privilege (those tests error in the baseline); do not pass backslash escapes or NUL bytes through shell heredocs when generating source (use a file-writing tool); files in the repo may be CRLF, so patch scripts must detect the line ending; subprocess output must be drained after killing the tree, never `subprocess.run(timeout=)`.
+
+## Contract and conformance
+
+`protocol/` (stdlib only) defines the public wire contract; `testkit/` holds the shared fixtures, an executable mock and two transports. `tests/test_protocol_conformance.py` runs identical scenarios against the mock and the real service; a scenario a world cannot prove must be listed in its `unsupported` table with a reason (it shows as UNSUPPORTED in `python -m examples.conformance_evidence`, never as a silent skip). Change the contract only by editing `protocol/` and its fixtures first. See `docs/MIGRATION_PHASES_0_2_REPORT.md`.
 
 ## Adversarial suite
 

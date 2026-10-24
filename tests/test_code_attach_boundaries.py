@@ -12,9 +12,9 @@ ROOT = Path(__file__).resolve().parents[1]
 PKG = ROOT / "code_attach"
 NETWORK = {"openai", "anthropic", "httpx", "requests", "urllib", "socket", "http", "aiohttp"}
 
-HOST_FILES = {"router.py", "providers.py", "__init__.py"}
+HOST_FILES = {"router.py", "providers.py", "__init__.py", "wire.py", "protocol_router.py"}
 HOST_FORBIDDEN = {"subprocess", "os", "shutil", "pathlib", "coding_agent", "host_mock"} | NETWORK
-HOST_ALLOWED_RELATIVE = {"engine", "router", "providers", ""}
+HOST_ALLOWED_RELATIVE = {"engine", "router", "providers", "wire", "protocol_router", ""}
 
 AGENT_FORBIDDEN = {"fastapi", "starlette", "pydantic", "host_mock"} | NETWORK
 AGENT_RULES = {

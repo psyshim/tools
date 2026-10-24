@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import tempfile
 import threading
+import time
 import uuid
 from .text_encoding import decode_source, encode_source
 
@@ -75,7 +76,15 @@ class Workflow:
             # Cooperative in-process only: external editor races remain possible.
             if path.read_bytes() != data:
                 raise Conflict("file changed during edit")
-            os.replace(tmp, path)
+            for attempt in range(6):
+                try:
+                    os.replace(tmp, path)
+                    break
+                except PermissionError:
+                    # Windows: an editor, indexer or antivirus may hold the target open for a moment. Retry briefly, never loop forever.
+                    if attempt == 5:
+                        raise
+                    time.sleep(0.05 * (attempt + 1))
             tmp = None
         finally:
             if tmp is not None:

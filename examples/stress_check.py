@@ -141,9 +141,10 @@ def size_boundary(root, over=False):
     else:
         # Exactly 8 MiB is legal as a file, but a single huge line is not a useful model page.
         require(tools.flow.inspect("boundary.py")["size"] == MAX_FILE_BYTES, "8 MiB boundary rejected")
-        expect_error(lambda: tools.t_read_file("boundary.py"), "32000")
+        page = tools.t_read_file("boundary.py")   # a single 8 MiB line is shortened and reported, never dumped into the model context
+        require(page.get("truncated_lines") and len(page["lines"][0]) < 2100, "enormous single-line read was not bounded")
     require(snapshot(root) == before, "boundary rejection modified source")
-    return {"source_bytes": len(body) + int(over), "observed": "oversize refused" if over else "8 MiB accepted; enormous single-line read refused"}
+    return {"source_bytes": len(body) + int(over), "observed": "oversize refused" if over else "8 MiB accepted; enormous single-line read is truncated and reported"}
 
 
 def oversized_edit(root):

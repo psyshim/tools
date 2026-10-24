@@ -69,12 +69,12 @@ def locate(text, old):
     if len(exact) == 1:
         return exact[0]
     if len(exact) > 1:
-        raise MatchError(f"old text occurs {len(exact)} times (lines {_lines_report(text, exact)}); include more surrounding lines so it matches exactly one place")
+        raise MatchError(f"old text must match exactly once, but it occurs {len(exact)} times (lines {_lines_report(text, exact)}); include more surrounding lines so it matches exactly one place")
     tolerant = [(m.start(), m.end()) for m in re.finditer(_eol_tolerant(old), text)]
     if len(tolerant) == 1:
         return tolerant[0]
     if len(tolerant) > 1:
-        raise MatchError(f"old text occurs {len(tolerant)} times ignoring line endings (lines {_lines_report(text, tolerant)}); include more surrounding lines")
+        raise MatchError(f"old text must match exactly once, but it occurs {len(tolerant)} times ignoring line endings (lines {_lines_report(text, tolerant)}); include more surrounding lines")
     spaced = [(m.start(), m.end()) for m in re.finditer(_whitespace_tolerant(old), text)]
     if spaced:
         s, e = spaced[0]

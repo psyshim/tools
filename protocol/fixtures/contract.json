@@ -1,0 +1,651 @@
+{
+ "_doc": "Contract fixtures shared by the executable mock and the real service. kind selects the validator; valid=false cases must be refused with expect_code. {\"$repeat\": [text, n]} expands to text*n.",
+ "cases": [
+  {
+   "name": "task minimal",
+   "kind": "task_request",
+   "valid": true,
+   "body": {
+    "workspace_id": "w1",
+    "instruction": "explain calc.py",
+    "idempotency_key": "k-1"
+   }
+  },
+  {
+   "name": "task read mode with version",
+   "kind": "task_request",
+   "valid": true,
+   "body": {
+    "protocol": "1.0",
+    "workspace_id": "w1",
+    "instruction": "x",
+    "idempotency_key": "k-2",
+    "mode": "read"
+   }
+  },
+  {
+   "name": "task newer minor version is accepted",
+   "kind": "task_request",
+   "valid": true,
+   "body": {
+    "protocol": "1.7",
+    "workspace_id": "w1",
+    "instruction": "x",
+    "idempotency_key": "k-3"
+   }
+  },
+  {
+   "name": "task missing workspace",
+   "kind": "task_request",
+   "valid": false,
+   "expect_code": "VALIDATION_FAILED",
+   "expect_field": "workspace_id",
+   "body": {
+    "instruction": "x",
+    "idempotency_key": "k"
+   }
+  },
+  {
+   "name": "task empty instruction",
+   "kind": "task_request",
+   "valid": false,
+   "expect_code": "VALIDATION_FAILED",
+   "expect_field": "instruction",
+   "body": {
+    "workspace_id": "w",
+    "instruction": "",
+    "idempotency_key": "k"
+   }
+  },
+  {
+   "name": "task instruction too long",
+   "kind": "task_request",
+   "valid": false,
+   "expect_code": "VALIDATION_FAILED",
+   "expect_field": "instruction",
+   "body": {
+    "workspace_id": "w",
+    "instruction": {
+     "$repeat": [
+      "x",
+      16385
+     ]
+    },
+    "idempotency_key": "k"
+   }
+  },
+  {
+   "name": "task wrong type",
+   "kind": "task_request",
+   "valid": false,
+   "expect_code": "VALIDATION_FAILED",
+   "expect_field": "workspace_id",
+   "body": {
+    "workspace_id": 5,
+    "instruction": "x",
+    "idempotency_key": "k"
+   }
+  },
+  {
+   "name": "task boolean is not a string",
+   "kind": "task_request",
+   "valid": false,
+   "expect_code": "VALIDATION_FAILED",
+   "expect_field": "idempotency_key",
+   "body": {
+    "workspace_id": "w",
+    "instruction": "x",
+    "idempotency_key": true
+   }
+  },
+  {
+   "name": "task unknown field is refused",
+   "kind": "task_request",
+   "valid": false,
+   "expect_code": "VALIDATION_FAILED",
+   "expect_field": "mode_typo",
+   "body": {
+    "workspace_id": "w",
+    "instruction": "x",
+    "idempotency_key": "k",
+    "mode_typo": "read"
+   }
+  },
+  {
+   "name": "task execute mode is not offered",
+   "kind": "task_request",
+   "valid": false,
+   "expect_code": "UNSUPPORTED_MODE",
+   "expect_field": "mode",
+   "body": {
+    "workspace_id": "w",
+    "instruction": "x",
+    "idempotency_key": "k",
+    "mode": "execute"
+   }
+  },
+  {
+   "name": "task other major version fails closed",
+   "kind": "task_request",
+   "valid": false,
+   "expect_code": "VERSION_MISMATCH",
+   "body": {
+    "protocol": "2.0",
+    "workspace_id": "w",
+    "instruction": "x",
+    "idempotency_key": "k"
+   }
+  },
+  {
+   "name": "task malformed version",
+   "kind": "task_request",
+   "valid": false,
+   "expect_code": "BAD_REQUEST",
+   "body": {
+    "protocol": "abc",
+    "workspace_id": "w",
+    "instruction": "x",
+    "idempotency_key": "k"
+   }
+  },
+  {
+   "name": "task body is a list",
+   "kind": "task_request",
+   "valid": false,
+   "expect_code": "BAD_REQUEST",
+   "body": [
+    "x"
+   ]
+  },
+  {
+   "name": "decision approve",
+   "kind": "decision",
+   "valid": true,
+   "body": {
+    "action_id": "a1",
+    "fingerprint": "f1",
+    "approve": true
+   }
+  },
+  {
+   "name": "decision approve must be boolean",
+   "kind": "decision",
+   "valid": false,
+   "expect_code": "VALIDATION_FAILED",
+   "expect_field": "approve",
+   "body": {
+    "action_id": "a1",
+    "fingerprint": "f1",
+    "approve": "yes"
+   }
+  },
+  {
+   "name": "decision missing fingerprint",
+   "kind": "decision",
+   "valid": false,
+   "expect_code": "VALIDATION_FAILED",
+   "expect_field": "fingerprint",
+   "body": {
+    "action_id": "a1",
+    "approve": false
+   }
+  },
+  {
+   "name": "event assistant message",
+   "kind": "event",
+   "valid": true,
+   "body": {
+    "protocol": "1.0",
+    "task_id": "t1",
+    "event_id": "1",
+    "type": "assistant_message",
+    "data": {
+     "text": "hello"
+    }
+   }
+  },
+  {
+   "name": "event tool activity",
+   "kind": "event",
+   "valid": true,
+   "body": {
+    "protocol": "1.0",
+    "task_id": "t1",
+    "event_id": "20",
+    "type": "tool_activity",
+    "data": {
+     "tool": "read_file",
+     "status": "OK"
+    }
+   }
+  },
+  {
+   "name": "event approval decision",
+   "kind": "event",
+   "valid": true,
+   "body": {
+    "protocol": "1.0",
+    "task_id": "t1",
+    "event_id": "21",
+    "type": "approval_decision",
+    "data": {
+     "action_id": "a",
+     "approve": false
+    }
+   }
+  },
+  {
+   "name": "event test result",
+   "kind": "event",
+   "valid": true,
+   "body": {
+    "protocol": "1.0",
+    "task_id": "t1",
+    "event_id": "22",
+    "type": "test_result",
+    "data": {
+     "status": "PASS",
+     "exit_code": 0,
+     "output": "OK"
+    }
+   }
+  },
+  {
+   "name": "event notice",
+   "kind": "event",
+   "valid": true,
+   "body": {
+    "protocol": "1.0",
+    "task_id": "t1",
+    "event_id": "23",
+    "type": "notice",
+    "data": {
+     "code": "tool_calls_dropped",
+     "count": 3
+    }
+   }
+  },
+  {
+   "name": "event proposal completed",
+   "kind": "event",
+   "valid": true,
+   "body": {
+    "protocol": "1.0",
+    "task_id": "t1",
+    "event_id": "2",
+    "type": "proposal_completed",
+    "data": {
+     "proposal_id": "p1",
+     "files": [
+      {
+       "path": "a.py",
+       "op": "write"
+      }
+     ],
+     "applied": false
+    }
+   }
+  },
+  {
+   "name": "event mutation applied receipt",
+   "kind": "event",
+   "valid": true,
+   "body": {
+    "protocol": "1.0",
+    "task_id": "t1",
+    "event_id": "3",
+    "type": "mutation_applied",
+    "data": {
+     "receipt": {
+      "status": "APPLIED",
+      "files": [
+       "a.py"
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "event approval required",
+   "kind": "event",
+   "valid": true,
+   "body": {
+    "protocol": "1.0",
+    "task_id": "t1",
+    "event_id": "4",
+    "type": "approval_required",
+    "data": {
+     "action_id": "a",
+     "fingerprint": "f",
+     "tool": "apply_proposal",
+     "summary": {
+      "kind": "edit"
+     }
+    }
+   }
+  },
+  {
+   "name": "event state",
+   "kind": "event",
+   "valid": true,
+   "body": {
+    "protocol": "1.0",
+    "task_id": "t1",
+    "event_id": "5",
+    "type": "state",
+    "data": {
+     "state": "COMPLETED"
+    }
+   }
+  },
+  {
+   "name": "event gap marker",
+   "kind": "event",
+   "valid": true,
+   "body": {
+    "protocol": "1.0",
+    "task_id": "t1",
+    "event_id": "9",
+    "type": "gap",
+    "data": {
+     "missing_from": "6"
+    }
+   }
+  },
+  {
+   "name": "event unknown type",
+   "kind": "event",
+   "valid": false,
+   "expect_code": "VALIDATION_FAILED",
+   "expect_field": "type",
+   "body": {
+    "protocol": "1.0",
+    "task_id": "t1",
+    "event_id": "1",
+    "type": "shell_output",
+    "data": {}
+   }
+  },
+  {
+   "name": "event proposal must never claim applied",
+   "kind": "event",
+   "valid": false,
+   "expect_code": "VALIDATION_FAILED",
+   "expect_field": "data.applied",
+   "body": {
+    "protocol": "1.0",
+    "task_id": "t1",
+    "event_id": "2",
+    "type": "proposal_completed",
+    "data": {
+     "proposal_id": "p",
+     "files": [],
+     "applied": true
+    }
+   }
+  },
+  {
+   "name": "event unknown state",
+   "kind": "event",
+   "valid": false,
+   "expect_code": "VALIDATION_FAILED",
+   "expect_field": "data.state",
+   "body": {
+    "protocol": "1.0",
+    "task_id": "t1",
+    "event_id": "1",
+    "type": "state",
+    "data": {
+     "state": "DONE"
+    }
+   }
+  },
+  {
+   "name": "event id must be decimal",
+   "kind": "event",
+   "valid": false,
+   "expect_code": "VALIDATION_FAILED",
+   "expect_field": "event_id",
+   "body": {
+    "protocol": "1.0",
+    "task_id": "t1",
+    "event_id": "abc",
+    "type": "state",
+    "data": {
+     "state": "RUNNING"
+    }
+   }
+  },
+  {
+   "name": "event data must be an object",
+   "kind": "event",
+   "valid": false,
+   "expect_code": "VALIDATION_FAILED",
+   "expect_field": "data",
+   "body": {
+    "protocol": "1.0",
+    "task_id": "t1",
+    "event_id": "1",
+    "type": "state",
+    "data": "RUNNING"
+   }
+  },
+  {
+   "name": "event other major version",
+   "kind": "event",
+   "valid": false,
+   "expect_code": "VERSION_MISMATCH",
+   "body": {
+    "protocol": "3.0",
+    "task_id": "t1",
+    "event_id": "1",
+    "type": "state",
+    "data": {
+     "state": "RUNNING"
+    }
+   }
+  },
+  {
+   "name": "event data over the size cap",
+   "kind": "event",
+   "valid": false,
+   "expect_code": "PAYLOAD_TOO_LARGE",
+   "body": {
+    "protocol": "1.0",
+    "task_id": "t1",
+    "event_id": "1",
+    "type": "assistant_message",
+    "data": {
+     "text": {
+      "$repeat": [
+       "x",
+       70000
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "events response running",
+   "kind": "events_response",
+   "valid": true,
+   "body": {
+    "protocol": "1.0",
+    "events": [],
+    "state": "RUNNING",
+    "terminal": false,
+    "next_cursor": 0
+   }
+  },
+  {
+   "name": "events response terminal",
+   "kind": "events_response",
+   "valid": true,
+   "body": {
+    "protocol": "1.0",
+    "state": "COMPLETED",
+    "terminal": true,
+    "next_cursor": 1,
+    "events": [
+     {
+      "protocol": "1.0",
+      "task_id": "t",
+      "event_id": "1",
+      "type": "state",
+      "data": {
+       "state": "COMPLETED"
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "events response terminal flag must agree with state",
+   "kind": "events_response",
+   "valid": false,
+   "expect_code": "VALIDATION_FAILED",
+   "expect_field": "terminal",
+   "body": {
+    "protocol": "1.0",
+    "events": [],
+    "state": "RUNNING",
+    "terminal": true,
+    "next_cursor": 0
+   }
+  },
+  {
+   "name": "events response ids must increase",
+   "kind": "events_response",
+   "valid": false,
+   "expect_code": "VALIDATION_FAILED",
+   "expect_field": "events",
+   "body": {
+    "protocol": "1.0",
+    "state": "RUNNING",
+    "terminal": false,
+    "next_cursor": 2,
+    "events": [
+     {
+      "protocol": "1.0",
+      "task_id": "t",
+      "event_id": "2",
+      "type": "notice",
+      "data": {
+       "code": "x"
+      }
+     },
+     {
+      "protocol": "1.0",
+      "task_id": "t",
+      "event_id": "2",
+      "type": "notice",
+      "data": {
+       "code": "y"
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "events response needs a cursor",
+   "kind": "events_response",
+   "valid": false,
+   "expect_code": "VALIDATION_FAILED",
+   "expect_field": "next_cursor",
+   "body": {
+    "protocol": "1.0",
+    "events": [],
+    "state": "RUNNING",
+    "terminal": false
+   }
+  },
+  {
+   "name": "capabilities read propose",
+   "kind": "capabilities",
+   "valid": true,
+   "body": {
+    "protocol": "1.0",
+    "available": true,
+    "modes": [
+     "read",
+     "propose"
+    ],
+    "mutation": false
+   }
+  },
+  {
+   "name": "capabilities with local experimental mutation",
+   "kind": "capabilities",
+   "valid": true,
+   "body": {
+    "protocol": "1.0",
+    "available": true,
+    "modes": [
+     "read",
+     "propose",
+     "apply",
+     "test"
+    ],
+    "mutation": true
+   }
+  },
+  {
+   "name": "capabilities mutation must agree with modes",
+   "kind": "capabilities",
+   "valid": false,
+   "expect_code": "VALIDATION_FAILED",
+   "expect_field": "mutation",
+   "body": {
+    "protocol": "1.0",
+    "available": true,
+    "modes": [
+     "read",
+     "propose"
+    ],
+    "mutation": true
+   }
+  },
+  {
+   "name": "capabilities unknown mode",
+   "kind": "capabilities",
+   "valid": false,
+   "expect_code": "VALIDATION_FAILED",
+   "expect_field": "modes",
+   "body": {
+    "protocol": "1.0",
+    "available": true,
+    "modes": [
+     "read",
+     "shell"
+    ],
+    "mutation": false
+   }
+  },
+  {
+   "name": "error envelope",
+   "kind": "error",
+   "valid": true,
+   "body": {
+    "protocol": "1.0",
+    "error": {
+     "code": "NOT_FOUND",
+     "message": "task not found"
+    }
+   }
+  },
+  {
+   "name": "error with unknown code",
+   "kind": "error",
+   "valid": false,
+   "expect_code": "VALIDATION_FAILED",
+   "expect_field": "error",
+   "body": {
+    "protocol": "1.0",
+    "error": {
+     "code": "TEAPOT",
+     "message": "x"
+    }
+   }
+  }
+ ]
+}

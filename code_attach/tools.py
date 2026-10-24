@@ -274,6 +274,8 @@ class ToolBox(NavTools, EditTools):
             raise ValueError("invalid edit size; split into edits of at most 20000 characters")
         start, end = locate(text, old)   # tolerant to line endings; otherwise fails with the actual text and line numbers
         actual, replacement = text[start:end], adapt_eol(text, start, end, new)
+        if len(actual) > 20000 or len(replacement) > 20000:   # measured after line-ending conversion: this is what apply will see
+            raise ValueError("invalid edit size; split into edits of at most 20000 characters")
         after = text[:start] + replacement + text[end:]
         if len(encode_source(after, codec, prefix)) > MAX_FILE_BYTES:
             raise ValueError("updated file too large")

@@ -695,6 +695,49 @@
     "tests.test_code_attach_posture.Posture.test_explicit_opt_in_restores_the_approval_flow"
    ],
    "integration": null
+  },
+  {
+   "id": "R30",
+   "title": "Public protocol contract + executable mock + shared fixtures (migration phase 2)",
+   "doc": [
+    "docs/MIGRATION_PHASES_0_2_REPORT.md",
+    "Gate P2"
+   ],
+   "code": [
+    [
+     "protocol/schema.py",
+     "def validate_task_request"
+    ],
+    [
+     "testkit/mock/service.py",
+     "class MockCodingService"
+    ],
+    [
+     "code_attach/protocol_router.py",
+     "def make_protocol_router"
+    ],
+    [
+     "code_attach/wire.py",
+     "def to_protocol_events"
+    ]
+   ],
+   "tests": [
+    "tests.test_protocol_contract.BoundaryTests.test_mock_shares_no_code_with_the_real_service",
+    "tests.test_protocol_contract.BoundaryTests.test_protocol_imports_only_stdlib_and_itself",
+    "tests.test_protocol_contract.BoundaryTests.test_testkit_depends_only_on_protocol_and_stdlib",
+    "tests.test_protocol_contract.FixtureTests.test_every_fixture_behaves_as_declared",
+    "tests.test_protocol_contract.FixtureTests.test_every_invalid_fixture_names_its_expected_error_code",
+    "tests.test_protocol_contract.FixtureTests.test_fixtures_cover_every_event_type_and_a_refusal_for_each_kind",
+    "tests.test_protocol_contract.VersioningTests.test_error_envelopes_validate_and_codes_map_to_statuses",
+    "tests.test_protocol_contract.VersioningTests.test_events_from_a_future_minor_version_still_validate",
+    "tests.test_protocol_contract.VersioningTests.test_major_mismatch_fails_closed_and_minor_is_tolerated",
+    "tests.test_protocol_conformance.MockConformance.test_cursor_is_gap_free_stable_and_replayable",
+    "tests.test_protocol_conformance.RealReadProposeConformance.test_cursor_is_gap_free_stable_and_replayable",
+    "tests.test_protocol_conformance.RealExperimentalConformance.test_experimental_mutation_yields_a_receipt_only_after_approval",
+    "tests.test_protocol_conformance.RealReadProposeConformance.test_other_major_protocol_version_fails_closed_on_every_route",
+    "tests.test_protocol_conformance.MockConformance.test_other_major_protocol_version_fails_closed_on_every_route"
+   ],
+   "integration": null
   }
  ],
  "deferred": [
