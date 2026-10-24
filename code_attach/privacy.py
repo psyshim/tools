@@ -3,6 +3,8 @@ import getpass
 import re
 from pathlib import Path
 
+from coding_agent.path_spellings import spellings
+
 BS = chr(92)
 
 class Scrubber:
@@ -16,8 +18,7 @@ class Scrubber:
             return text
         home = Path.home()
         for base, label in ((self.root, "<workspace>"), (home, "~")):
-            variants = {str(base), base.as_posix(), str(base).replace(BS, BS + BS)}
-            pattern = "|".join(re.escape(v) for v in sorted(variants, key=len, reverse=True))
+            pattern = "|".join(re.escape(v) for v in spellings(base))
             text = re.sub(pattern, lambda m, label=label: label, text, flags=re.IGNORECASE)
         try:
             user = getpass.getuser()

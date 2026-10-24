@@ -1,0 +1,16 @@
+{
+  "_doc": "Loose upper bounds, several times the usual value on a developer machine, so that only an order-of-magnitude regression trips them. Values: KiB, milliseconds (_ms), seconds (_s). Tighten only with evidence from delivery receipts.",
+  "limits": {
+    "kit_wheel_kib": 100,
+    "kit_unpacked_kib": 300,
+    "kit_import_ms_best": 3000,
+    "wrapper_start_ms_p95": 50,
+    "wrapper_events_ms_p95": 50,
+    "stack_ready_s": 60,
+    "stack_first_request_ms": 5000,
+    "stack_first_event_ms": 1000,
+    "stack_warm_start_ms_best": 500,
+    "stack_poll_ms_p95": 500
+  },
+  "suite_wall_minutes": 30
+}

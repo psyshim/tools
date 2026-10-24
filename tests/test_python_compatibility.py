@@ -12,7 +12,7 @@ from coding_agent.workspace import Workspace, _reparse
 class PythonCompatibilityTests(unittest.TestCase):
     def test_scan_works_without_os_path_isjunction(self):
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = Path(directory).resolve()      # the workspace reports resolved paths; a temp dir may be spelled as an 8.3 alias
             (root / "src").mkdir()
             (root / "src/a.py").write_bytes(b"x = 1\n")
             old = getattr(os.path, "isjunction", None)

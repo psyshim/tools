@@ -969,6 +969,58 @@
     "tests.test_sample_host_contract.WrapperSuiteShipsInTheKit.test_the_installed_kit_contains_a_working_suite_and_fake_service"
    ],
    "integration": null
+  },
+  {
+   "id": "R38",
+   "title": "Delivery gate: one command decides deliverability and writes a receipt; it demonstrably fails on unsafe defaults, powerful/personal kit contents, doc drift and dirty trees",
+   "doc": [
+    "docs/DELIVERY_POLICY.md",
+    "納品の定義"
+   ],
+   "code": [
+    [
+     "hostkit_build/release_gate.py",
+     "def main"
+    ],
+    [
+     "coding_agent/path_spellings.py",
+     "def spellings"
+    ]
+   ],
+   "tests": [
+    "tests.test_release_gate.GateSaysNo.test_the_undamaged_copy_passes_everything_that_does_not_need_git_or_the_full_suite",
+    "tests.test_release_gate.GateSaysNo.test_a_personal_path_in_the_kit_is_caught",
+    "tests.test_release_gate.GateSaysNo.test_a_powerful_import_in_the_kit_is_caught",
+    "tests.test_release_gate.GateSaysNo.test_a_document_that_names_a_missing_file_is_caught",
+    "tests.test_release_gate.GateSaysNo.test_a_configuration_example_the_loaders_reject_is_caught",
+    "tests.test_release_gate.GateSaysNo.test_an_unsafe_default_is_caught",
+    "tests.test_path_spellings.Spellings.test_the_usual_forms_are_all_covered"
+   ],
+   "integration": null
+  },
+  {
+   "id": "R39",
+   "title": "Speed and weight are requirements with budgets: measured identically each time, judged loosely, recorded in the delivery receipt",
+   "doc": [
+    "docs/DELIVERY_POLICY.md",
+    "速度・軽快さの予算"
+   ],
+   "code": [
+    [
+     "hostkit_build/perf.py",
+     "def evaluate"
+    ],
+    [
+     "hostkit_build/perf_budgets.json",
+     "limits"
+    ]
+   ],
+   "tests": [
+    "tests.test_perf_budgets.Budgets.test_the_evaluator_flags_a_breach_and_a_missing_measurement",
+    "tests.test_perf_budgets.Budgets.test_every_limit_is_a_positive_number_with_a_unit_in_its_name",
+    "tests.test_perf_budgets.CheapMeasurements.test_the_kit_is_light_and_the_wrapper_adds_almost_nothing"
+   ],
+   "integration": null
   }
  ],
  "deferred": [

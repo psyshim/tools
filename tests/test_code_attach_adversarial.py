@@ -426,10 +426,17 @@ class HostileHttp(Base):
         sb = self.sandbox()
         logs = Path(sb.parent) / "logs"
         c = self.client(sb, event_sink=ActivityLog(logs).record)
+        started = []
         for instruction in ("\ud800 broken", "tab\tnul\x00bell\x07", "日本語\u202eRLO", "\U0001f600" * 100):
             body = json.dumps({"workspace_id": "w", "instruction": instruction, "idempotency_key": "k" + str(abs(hash(instruction)))})  # ensure_ascii: the surrogate travels as a \ud800 escape
             r = c.post("/tasks", content=body.encode("ascii"), headers={"x-user": "u", "content-type": "application/json"})
             self.assertLess(r.status_code, 500, repr(instruction))
+            if r.status_code < 300:
+                started.append(r.json()["task_id"])
+        deadline = time.time() + 15
+        for tid in started:                                         # tasks log from their own threads: let them finish before reading or deleting the logs
+            while time.time() < deadline and not c.get(f"/tasks/{tid}/events", headers={"x-user": "u"}).json().get("terminal"):
+                time.sleep(0.02)
         self.assertTrue(all(json.loads(line) for f in logs.glob("*.jsonl") for line in f.read_text(encoding="utf-8").splitlines()), "every log line must stay valid JSON")
 
 class ProvidersAndScrubber(Base):
