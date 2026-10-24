@@ -58,7 +58,7 @@ for route in ROUTES:                                  # (name, method, path) の
 | `GET /coding/availability` | なし | `{"available": bool, "reason": str\|null, "modes": ["read","propose",...], "mutation": bool}`。サービスが落ちていても 200(`available:false`) |
 | `POST /coding/start` | `{"workspace_id","text","conversation_id","message_id"}`(全て非空文字列。`text` ≤ 20000、他 ≤ 128 文字) | `{"ok":true,"handle":"<不透明ID>"}`。同じ `conversation_id`+`message_id` は同じ handle(再送・二重クリックで二重起動しない) |
 | `GET /coding/{handle}/events?after=<cursor>` | `after` は前回の `next`(初回 `0`) | `{"ok":true,"terminal":bool,"next":"<cursor>","events":[{"id","type","html","synthetic","data"}]}` |
-| `POST /coding/{handle}/decision` | `{"action_id","fingerprint","approve": true\|false}`(`approve` は真偽値) | `{"ok": true}`(受理)/ `{"ok": false}` |
+| `POST /coding/{handle}/decision` | `{"action_id","fingerprint","approve": true\|false}`(`approve` は真偽値) | `{"ok": true}`(受理)。受理されない場合(古いカード・指紋不一致・回答済み)は 409 `{"ok":false,"error":"no_pending_action","already_decided":bool}` |
 | `POST /coding/{handle}/cancel` | `{}` | `{"ok":true,"state":"CANCELLED"\|...}`(既に終了していればその状態) |
 
 エラー応答は `{"ok":false,"error":"<token>", "reason"?:...}`。ステータスは次の対応で固定:
@@ -101,7 +101,39 @@ for route in ROUTES:                                  # (name, method, path) の
 - `audit` で ID のみを監査ログに残す(本文は残さない)。
 - 画面は 1〜2 秒間隔のポーリングで足りる(SSE は不要)。
 
-## 8. 受け入れ確認(先方が書き終えたら実行)
+## 8. テスト(先方の既存テスト実行にそのまま組み込める)
+
+### 8.1 ユニットテスト一式 `host_client.testing.WrapperContract`(ネットワーク不要・実サービス不要)
+
+キットに偽のコーディングサービスが同梱されているので、先方の CI で、実サービスなしに、ラッパーの契約を 17 項目検査できる。先方が書くのは「ユーザーを指定してアプリを呼ぶ」小さなハーネスと 4 つの定数だけ。
+
+```python
+import unittest
+from host_client.testing import WrapperContract
+
+class MyWrapperTests(WrapperContract, unittest.TestCase):
+    USER_A, USER_B = "alice", "bob"                 # 先方のログインが返すユーザー ID
+    WORKSPACE_A, WORKSPACE_B = "w-alice", "w-bob"   # A は前者だけ、B は後者だけ使える(先方の ACL 設定)
+    CHAT = ("POST", "/chat", {"message": "hi"})     # 任意: 既存チャット(サービス停止中も動くことを検査)
+
+    def make_host(self, gateway):                   # 渡された gateway を使うようにラッパーを組み立てて返す
+        return MyHarness(build_my_app(gateway))
+
+class MyHarness:
+    def request(self, method, path, user, body=None, query=None):
+        ...   # user としてアプリを呼び (status, json) を返す。user=None は未ログイン
+```
+
+完全なテンプレート: `tests/test_sample_host_contract.py`(サンプルホスト用。ここをコピーして `make_host` を差し替える)。
+
+検査項目(失敗したテスト名が破った規則を示す): 未ログイン拒否 / availability の形 / サービス停止時の 503 とチャット無影響 / 資格情報拒否・HTML・不正応答でも 503 で漏えいなし / 二重起動なし / ACL はローカルで 403 / 不正入力は 400 / 利用者 ID の伝達 / 他人の読み取り・取消・承認不可 / 不明 handle / イベントの順序・再開・終了 / 不正カーソル / 敵対的テキストのエスケープと長さ制限 / 承認カードの内容と決定の厳密さ / 取消の冪等 / 不明ルート / 上限超えイベントの拒否。
+全応答に対し、絶対パスとサービス資格情報が含まれないことも自動で検査する。
+
+このスイート自体の品質確認として、わざと壊したラッパー(ACL 全許可、全員が同一ユーザー扱い、未ログイン通過、イベント本文の生表示、サービス停止時に 500)が、それぞれ該当する検査で必ず失敗することをテストしている。
+
+### 8.2 受け入れ確認 `host_client.acceptance`(動いているバックエンドに対する外部検査)
+
+書き終えたら実行する。
 
 テスト用に別々の 2 ユーザー、ユーザー A が使える workspace と使えない workspace を用意して実行する。
 

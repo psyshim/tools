@@ -7,6 +7,8 @@ import the agent, tool, file or Git packages (tests/test_protocol_contract.py en
 Scripted behaviour keyed by the instruction text:
   "propose ..."  assistant message, one proposal_completed (applied=false), COMPLETED
   "approve ..."  waits for a decision on a (mock) approval card, then COMPLETED; the mock NEVER reports a mutation
+  "hostile ..."  an assistant message full of markup, control characters and a 60 kB body, then COMPLETED (for host escaping tests)
+  "oversize ..." an event beyond the protocol size limit (the client must refuse it as a contract violation)
   anything else  one assistant message, COMPLETED
 """
 import hashlib
@@ -95,7 +97,13 @@ class MockCodingService:
             self._keys[(principal, request["idempotency_key"])] = task["id"]
         text = request["instruction"]
         self._emit(task, "assistant_message", {"text": "mock: working on it"})
-        if text.startswith("approve"):
+        if text.startswith("hostile"):
+            self._emit(task, "assistant_message", {"text": "<script>alert(1)</script> <img src=x onerror=alert(2)> & \x00\x07 end " + "A" * 60000})
+            self._finish(task, "COMPLETED")
+        elif text.startswith("oversize"):
+            self._emit(task, "assistant_message", {"text": "A" * 100000})      # beyond the protocol limit: a contract violation
+            self._finish(task, "COMPLETED")
+        elif text.startswith("approve"):
             task["pending"] = {"action_id": "mock-action-1", "fingerprint": "mock-fingerprint-1"}
             task["state"] = "AWAITING_APPROVAL"
             self._emit(task, "approval_required", {**task["pending"], "tool": "mock_action", "summary": {"kind": "mock"}})

@@ -102,7 +102,9 @@ class CodingAdapter:
             outcome = self.gateway.submit_decision(user, TaskHandle(handle_id), action_id, fingerprint, approve)
         except (AgentUnavailable, ProtocolRefused) as exc:
             return self._failure(exc)
-        return {"ok": outcome.accepted}
+        if outcome.accepted:
+            return {"ok": True}
+        return {"ok": False, "error": "no_pending_action", "already_decided": bool(outcome.already_decided)}   # stale card, wrong fingerprint, or answered already
 
     def cancel(self, user, handle_id):
         try:
