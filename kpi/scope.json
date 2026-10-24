@@ -738,6 +738,64 @@
     "tests.test_protocol_conformance.MockConformance.test_other_major_protocol_version_fails_closed_on_every_route"
    ],
    "integration": null
+  },
+  {
+   "id": "R31",
+   "title": "Phase 3: separately installable powerless host client, sample host, isolation proof",
+   "doc": [
+    "packages/host_client/README.md",
+    "What the host writes"
+   ],
+   "code": [
+    [
+     "packages/host_client/host_client/gateway.py",
+     "class AgentGateway"
+    ],
+    [
+     "hostkit_build/build_host_kit.py",
+     "def build"
+    ],
+    [
+     "examples/sample_host/adapter.py",
+     "class CodingAdapter"
+    ]
+   ],
+   "tests": [
+    "tests.test_host_client.Failure.test_a_service_that_violates_the_contract_fails_closed",
+    "tests.test_host_client.Failure.test_observation_times_out_with_a_resumable_position",
+    "tests.test_host_client.Failure.test_other_major_version_means_unavailable_never_a_fallback",
+    "tests.test_host_client.Failure.test_oversized_responses_are_refused",
+    "tests.test_host_client.Failure.test_rejected_service_credential_is_a_configuration_problem_not_a_user_problem",
+    "tests.test_host_client.Failure.test_service_absent_never_raises_from_availability_and_start_is_typed",
+    "tests.test_host_client.Failure.test_transient_gateway_errors_are_retried_with_backoff_then_surface",
+    "tests.test_host_client.InputHygiene.test_local_validation_blocks_injection_before_any_request",
+    "tests.test_host_client.InputHygiene.test_unicode_principals_survive_the_header_round_trip",
+    "tests.test_host_client.InputHygiene.test_untrusted_event_content_is_cleaned_bounded_and_escapable",
+    "tests.test_host_client.Kit.test_build_is_reproducible_and_verifiable",
+    "tests.test_host_client.Kit.test_host_client_sources_import_nothing_powerful",
+    "tests.test_host_client.Kit.test_installed_kit_works_with_no_agent_or_web_framework_present",
+    "tests.test_host_client.Lifecycle.test_a_missing_event_produces_a_visible_gap_marker",
+    "tests.test_host_client.Lifecycle.test_availability_reports_capabilities_without_raising",
+    "tests.test_host_client.Lifecycle.test_cancel_reports_the_services_state_and_never_invents_one",
+    "tests.test_host_client.Lifecycle.test_decision_flow_and_an_ambiguous_retry_is_resolved_from_the_log",
+    "tests.test_host_client.Lifecycle.test_duplicate_delivery_is_rendered_once",
+    "tests.test_host_client.Lifecycle.test_expired_cursor_restarts_from_what_the_service_still_has",
+    "tests.test_host_client.Lifecycle.test_other_user_cannot_observe_cancel_or_decide",
+    "tests.test_host_client.Lifecycle.test_propose_flow_streams_safe_events_to_a_terminal_state",
+    "tests.test_host_client.Lifecycle.test_resume_continues_after_the_last_rendered_event",
+    "tests.test_host_client.Lifecycle.test_revocation_stops_delivery_immediately",
+    "tests.test_host_client.Lifecycle.test_the_same_message_is_the_same_task_even_after_a_lost_response",
+    "tests.test_host_client.Lifecycle.test_wrong_fingerprint_is_not_accepted",
+    "tests.test_host_client.OverSockets.test_full_flow_over_http",
+    "tests.test_sample_host.ClientAgainstTheRealService.test_experimental_mutation_flow_through_the_client",
+    "tests.test_sample_host.ClientAgainstTheRealService.test_other_users_and_unknown_workspaces_are_refused_by_the_service",
+    "tests.test_sample_host.ClientAgainstTheRealService.test_propose_flow_end_to_end_without_any_mutation",
+    "tests.test_sample_host.ClientAgainstTheRealService.test_wrong_service_credential_is_reported_as_a_configuration_problem",
+    "tests.test_sample_host.DetachableHost.test_full_flow_through_the_host_with_the_mock",
+    "tests.test_sample_host.DetachableHost.test_host_boots_and_chats_with_the_coding_service_absent",
+    "tests.test_sample_host.DetachableHost.test_the_host_acl_is_the_hosts_own_decision_and_costs_no_network_call"
+   ],
+   "integration": null
   }
  ],
  "deferred": [

@@ -13,6 +13,7 @@ import time
 import unittest
 
 GATES = {
+    "multifile_failure_and_reference_oracle": ("test_multifile_failure_barriers.",),
     "workspace_boundary": ("test_workspace.", "test_security_boundary_regression.", "test_housekeeping."),
     "discovery_and_large_sources": ("test_code_attach_project.", "test_large_scripts."),
     "hostile_encodings": ("test_encoding_adversarial.",),

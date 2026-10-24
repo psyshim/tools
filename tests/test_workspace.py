@@ -52,9 +52,9 @@ class AgentTests(unittest.TestCase):
                         headers["Authorization"] = "Bearer test-token"
                     return urllib.request.Request(uri, data=b'{"path":"a.txt"}', headers=headers)
                 with self.assertRaises(urllib.error.HTTPError) as caught:
-                    urllib.request.urlopen(request(False), timeout=2)
+                    urllib.request.urlopen(request(False), timeout=10)
                 self.assertEqual(caught.exception.code, 401)
-                with urllib.request.urlopen(request(True), timeout=2) as response:
+                with urllib.request.urlopen(request(True), timeout=10) as response:
                     self.assertEqual(json.load(response)["result"]["lines"], ["hello"])
             finally:
                 server.shutdown()

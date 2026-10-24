@@ -13,15 +13,19 @@ import hashlib
 import json
 import threading
 import uuid
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, unquote, urlsplit
 
 from protocol import schema
 from protocol.schema import ProtocolError
 
 class MockCodingService:
-    def __init__(self, tokens, workspaces):
-        """tokens: {bearer_token: principal}; workspaces: {principal: {workspace_id, ...}}."""
+    def __init__(self, tokens, workspaces, host_credentials=None):
+        """tokens: {bearer_token: principal}; workspaces: {principal: {workspace_id, ...}}.
+        host_credentials: optional set of service credentials; a request carrying one names its end user in X-Principal
+        (percent-encoded), which is how a host client authenticates (the host vouches for its users)."""
         self.tokens, self.workspaces = dict(tokens), {k: set(v) for k, v in workspaces.items()}
+        self.host_credentials = set(host_credentials or ())
+        self.fail_next = []   # test hook: error codes to answer with on the next calls, e.g. ["CURSOR_EXPIRED"]
         self._tasks, self._keys = {}, {}
         self._lock = threading.Lock()
 
@@ -29,8 +33,10 @@ class MockCodingService:
     def handle(self, method, path, headers=None, body=None):
         headers = {k.lower(): v for k, v in (headers or {}).items()}
         try:
-            principal = self._authenticate(headers)
+            principal = self._authenticate(headers, path)
             schema.check_version(headers.get("x-protocol-version"))
+            if self.fail_next:
+                raise ProtocolError(self.fail_next.pop(0), "injected failure")
             parts = urlsplit(path)
             segments = [s for s in parts.path.split("/") if s]
             query = parse_qs(parts.query)
@@ -51,9 +57,13 @@ class MockCodingService:
             return exc.status, exc.envelope()
 
     # --- behaviour ---
-    def _authenticate(self, headers):
+    def _authenticate(self, headers, path=""):
         supplied = headers.get("authorization", "")
-        principal = self.tokens.get(supplied[7:]) if supplied.startswith("Bearer ") else None
+        token = supplied[7:] if supplied.startswith("Bearer ") else None
+        principal = self.tokens.get(token) if token is not None else None
+        if principal is None and token in self.host_credentials:
+            named = unquote(headers.get("x-principal", ""))
+            principal = "host:" + named if named else ("host-level" if urlsplit(path).path == "/availability" else None)
         if principal is None:
             raise ProtocolError("UNAUTHENTICATED", "missing or unknown credentials")
         return principal
