@@ -33,7 +33,13 @@ def main(argv=None):
     except OSError as exc:
         print(f"service refuses to start: cannot open the task store ({type(exc).__name__}); it may be corrupt, locked or unwritable", file=sys.stderr)
         return 4
-    summary = manager.recover()
+    try:
+        summary = manager.recover()
+    except OSError as exc:
+        manager.shutdown()
+        manager.store.close()
+        print(f"service refuses to start: task history cannot be read ({type(exc).__name__}); inspect the store before retrying", file=sys.stderr)
+        return 4
     print("recovery: " + ", ".join(f"{k}={len(v)}" for k, v in summary.items()), flush=True)
     server = uvicorn.Server(uvicorn.Config(create_app(config, manager), host="127.0.0.1", port=args.port, log_level="warning", access_log=False))
     if args.ready_file:

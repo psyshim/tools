@@ -14,6 +14,7 @@ from coding_service.store import TaskStore
 class RestoreProcessStackTests(unittest.TestCase):
     def test_restore_holds_a_live_model_attempt_and_preserves_idempotency(self):
         stack = Stack(self)
+        original_bytes = stack.project.joinpath("a.txt").read_bytes()
         flag = stack.base / "model-release.flag"
         stack.env_extra["MODEL_RELEASE_FLAG"] = str(flag)
         stack.start()
@@ -51,4 +52,4 @@ class RestoreProcessStackTests(unittest.TestCase):
             self.assertEqual(connection.execute("SELECT COUNT(*) FROM tasks").fetchone()[0], 1)
         finally:
             connection.close()
-        self.assertEqual(stack.project.joinpath("a.txt").read_bytes(), b"alpha\n")
+        self.assertEqual(stack.project.joinpath("a.txt").read_bytes(), original_bytes)

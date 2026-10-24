@@ -935,6 +935,33 @@
     "tests.test_protocol_conformance.StackExperimentalConformance.test_experimental_mutation_yields_a_receipt_only_after_approval"
    ],
    "integration": null
+  },
+  {
+   "id": "R37",
+   "title": "Host wrapper kit: HostEnvironment interface, generic endpoints, spec, and a black-box acceptance tool that fails broken hosts",
+   "doc": [
+    "docs/HOST_WRAPPER_SPEC.md",
+    "ルート仕様"
+   ],
+   "code": [
+    [
+     "packages/host_client/host_client/wrapper.py",
+     "class CodingEndpoints"
+    ],
+    [
+     "packages/host_client/host_client/acceptance.py",
+     "def run"
+    ]
+   ],
+   "tests": [
+    "tests.test_host_wrapper.Dispatch.test_the_acl_is_local_and_a_failing_acl_means_no",
+    "tests.test_host_wrapper.Dispatch.test_the_feature_flag_hides_everything_but_availability",
+    "tests.test_host_wrapper.Dispatch.test_input_is_validated_before_anything_else",
+    "tests.test_host_wrapper.AcceptanceTool.test_the_sample_host_passes_every_check",
+    "tests.test_host_wrapper.AcceptanceTool.test_it_fails_a_host_whose_acl_is_missing",
+    "tests.test_host_wrapper.AcceptanceTool.test_it_fails_a_host_that_leaks_one_users_task_to_another"
+   ],
+   "integration": null
   }
  ],
  "deferred": [

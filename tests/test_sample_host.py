@@ -46,7 +46,7 @@ class DetachableHost(unittest.TestCase):
             raise ConnectionRefusedError("no service")
         host = TestClient(create_app(gateway(down)))
         self.assertEqual(host.post("/chat", json={"message": "hello"}, headers=ALICE).json()["reply"], "echo for alice: hello")
-        self.assertEqual(host.get("/coding/availability", headers=ALICE).json(), {"available": False, "reason": "unreachable", "modes": []})
+        self.assertEqual(host.get("/coding/availability", headers=ALICE).json(), {"available": False, "reason": "unreachable", "modes": [], "mutation": False})
         started = host.post("/coding/start", json={"workspace_id": "w1", "text": "x", "conversation_id": "c", "message_id": "m"}, headers=ALICE).json()
         self.assertEqual((started["ok"], started["error"], started["reason"]), (False, "unavailable", "unreachable"))
         self.assertEqual(host.post("/chat", json={"message": "still fine"}, headers=ALICE).status_code, 200, "ordinary chat is unaffected")

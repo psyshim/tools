@@ -1,5 +1,7 @@
 # Host Backend Wrapper — Requirements
 
+> **SUPERSEDED by `docs/HOST_WRAPPER_SPEC.md`** (implemented and tested). The text below is the earlier proposal and is kept for history.
+
 Status: proposed future contract (not yet implemented). This document is for the team maintaining the existing chat backend. Related: [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Purpose and boundary

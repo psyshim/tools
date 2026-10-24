@@ -74,6 +74,51 @@ Export writes are staged and synced before no-overwrite publication; a failed
 write/fsync does not leave an apparently complete destination. Successful export
 results include the SHA-256 of the exact JSONL bytes.
 
+Full exports begin each task with a `task_metadata` record containing its original
+instruction, principal, workspace and state from the same snapshot as the events.
+Metadata-only exports omit those contents. The result counts event records and
+task metadata records separately.
+
+## Service database backup and verified restore
+
+The service backup captures tasks, ordered logs, request identities and the usage
+ledger with SQLite's backup API, including live WAL contents. It is not a copy of
+just the main `.db` file. The snapshot is validated, synced and published without
+overwriting an existing file; its SHA-256 is returned.
+
+```powershell
+$backupReceipt = python -m coding_service.manage --db .code-attach/service.db backup --output .code-attach/service-backup.db | ConvertFrom-Json
+python -m coding_service.manage --db .code-attach/restored-service.db restore --input .code-attach/service-backup.db --sha256 $backupReceipt.sha256
+```
+
+Restore accepts only a matching hash, recognized backup format, supported schema
+version/columns and healthy records. It writes a **new** database path; it cannot
+overwrite a running or existing store. Optional `--timeout` sets a cooperative
+deadline (1–300 seconds, default 60), checked during SQLite work, copying, record
+validation and hashing. It cannot interrupt an OS call stuck in disk/network IO.
+Failed checks or writes publish no destination.
+
+All unfinished tasks in a restored snapshot become `NEEDS_RECONCILIATION` with an
+explanatory notice in the same transaction. Even a task that had not started at
+snapshot time may have incurred model calls or effects later. No old task resumes
+automatically. Its idempotency key stays consumed; inspect the actual workspace,
+device journal and usage before submitting a fresh request as a new message.
+Historical completed tasks and measured usage remain in the snapshot. Adjust the
+service configuration's `db_path` only after stopping the old service.
+
+This command backs up **service state only**. It does not back up or restore the
+device journal, file-recovery copies, workspace files, Git, configuration files or
+environment credentials. It does not undo changes made since the snapshot. For
+physical detachment, stop both processes and retain the whole configured device
+state and component configuration as well; do not treat this service snapshot as
+a complete machine/workspace backup.
+
+The store uses a schema version marker. Known unversioned tables are upgraded
+without discarding records. Unknown versions/columns and unrelated databases are
+refused. Damaged durable JSON yields `LOG_UNAVAILABLE` or a failed local command,
+never zero usage or a guess that no task had started. Recovery validates all
+unfinished histories before starting any recovered worker.
+
 The prototype `examples.local_app` still supports JSONL activity logs via
 `--log-dir .code-attach/logs`. It records `model_usage` events, but the durable
 service database is the accounting/reporting authority described above. Its

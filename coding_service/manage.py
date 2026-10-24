@@ -118,7 +118,7 @@ def main(argv=None):
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
     except (LogUnavailable, sqlite3.Error, OSError, ValueError) as exc:
-        print(f"administration failed: {type(exc).__name__}", file=sys.stderr)
+        print(f"administration failed: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 1
     finally:
         if store is not None:

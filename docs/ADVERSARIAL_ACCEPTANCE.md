@@ -48,6 +48,12 @@ zero-exit commands without a recognized test summary retain `PASS` with
 Source SHA-256 fingerprints and any changed paths are recorded in acceptance
 reports; a changing source tree cannot produce an overall PASS.
 
+Class/module fixture failures and skips are recorded even though unittest does
+not call `startTest`/`stopTest` for them. Records identify their fixture scope and
+target. An `expectedFailure` marker cannot convert a known broken requirement
+into acceptance success, and an unexpected success remains unverified until its
+stale marker is removed and it is rerun.
+
 Protocol data budgets count serialized UTF-8 bytes, including JSON escaping.
 Oversized approval cards are refused before becoming decidable, with a request to
 split the proposal; an approval diff is never silently shortened. Derived display

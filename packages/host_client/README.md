@@ -6,7 +6,7 @@ A powerless client for the coding service. Standard library plus the `protocol` 
 
 ```bash
 python -m hostkit_build.build_host_kit --out dist/host_kit      # reproducible wheel + SHA256SUMS + KIT_MANIFEST.json (source revision, per-file hashes)
-pip install dist/host_kit/code_host_kit-1.0.0-py3-none-any.whl
+pip install dist/host_kit/code_host_kit-1.1.0-py3-none-any.whl
 pip uninstall code-host-kit                                      # removal leaves ordinary chat, login and uploads untouched
 ```
 
@@ -26,7 +26,7 @@ gateway.cancel_coding(user_id, handle)                                          
 gateway.submit_decision(user_id, handle, action_id, fingerprint, approve)         # optional; only with a reliable approval UI
 ```
 
-`user_id` must be the identity the host verified; `workspace_id` must already have passed the host's own ACL check. Render `SafeDisplayEvent.html_text` (cleaned, bounded and escaped), never raw server fields. A complete working example is `examples/sample_host/` (about 60 lines of adapter).
+`user_id` must be the identity the host verified; `workspace_id` must already have passed the host's own ACL check. Render `SafeDisplayEvent.html_text` (cleaned, bounded and escaped), never raw server fields. Most hosts do not call the gateway directly: subclass `HostEnvironment` (one required method, the workspace ACL), build `CodingEndpoints(gateway, environment)`, and mount `ROUTES` (specification: `docs/HOST_WRAPPER_SPEC.md`; example: `examples/sample_host/app.py`). Check the finished wrapper with `python -m host_client.acceptance`.
 
 ## Behaviour you can rely on
 

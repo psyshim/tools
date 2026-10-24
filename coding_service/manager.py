@@ -139,9 +139,13 @@ class DurableManager:
     def recover(self):
         """Close or resume every task that was not terminal when the process last stopped. Returns a summary for the operator."""
         summary = {"resumed": [], "interrupted": [], "needs_reconciliation": []}
-        for row in self.store.incomplete():
-            events = self.store.all_events(row["id"])
-            if not any(kind == "notice" and data.get("code") == "worker_started" for _, kind, data in events):
+        # Read and validate every history before spawning any worker. One damaged
+        # task must not leave a half-started service charging for other model calls.
+        histories = [(row, self.store.all_events(row["id"])) for row in self.store.incomplete()]
+        for row, events in histories:
+            never_started = row["state"] == "ACCEPTED" and bool(events) and all(
+                kind == "notice" and data.get("code") in {"task_accepted", "cancel_requested"} for _, kind, data in events)
+            if never_started:
                 if any(kind == "notice" and data.get("code") == "cancel_requested" for _, kind, data in events):
                     self.store.append(row["id"], "state", {"state": "CANCELLED", "detail": "cancellation was recorded before restart"})
                     summary["interrupted"].append(row["id"])
@@ -154,7 +158,9 @@ class DurableManager:
                 self._spawn(row["id"], row["principal"], target, row["instruction"])   # it never ran: starting it now loses nothing
                 summary["resumed"].append(row["id"])
                 continue
-            in_flight, uncertain, cancelled = None, False, False
+            missing_worker_record = row["state"] != "ACCEPTED" and not any(
+                kind == "notice" and data.get("code") == "worker_started" for _, kind, data in events)
+            in_flight, uncertain, cancelled = None, not bool(events) or missing_worker_record, False
             for _, kind, data in events:
                 if kind == "approval_decision" and data.get("approve"):
                     in_flight = data.get("action_id")
@@ -164,8 +170,8 @@ class DurableManager:
                 elif kind == "notice" and data.get("code") == "cancel_requested":
                     cancelled = True
             if in_flight or uncertain:
-                self.store.append(row["id"], "notice", {"code": "service_restarted_during_action", "action_id": in_flight})
-                self.store.append(row["id"], "state", {"state": "NEEDS_RECONCILIATION", "detail": "the service stopped while an approved action was running; its outcome is unknown"})
+                self.store.append(row["id"], "notice", {"code": "service_restarted_during_action" if in_flight else "service_restarted_with_uncertain_history", "action_id": in_flight})
+                self.store.append(row["id"], "state", {"state": "NEEDS_RECONCILIATION", "detail": "service history or action outcome is uncertain; inspect the workspace and ledger before continuing"})
                 summary["needs_reconciliation"].append(row["id"])
             elif cancelled:
                 self.store.append(row["id"], "state", {"state": "CANCELLED", "detail": "cancellation was recorded before restart"})
