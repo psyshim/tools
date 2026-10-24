@@ -1,6 +1,6 @@
 # code_attach v0 — host wiring (1-day delivery)
 
-**Status:** IMPLEMENTED and TESTED locally (`tests/test_code_attach.py`, scripted fake model, no real LLM or real chat app yet). **INTEGRATED: no.**
+**Status:** IMPLEMENTED and TESTED locally with scripted mock models (`tests/test_code_attach*.py`: normal, abnormal, boundary; no real LLM or real chat app yet). **INTEGRATED: no.**
 
 ## Deviation from ADR-004 (decided 2026-10-24, owner-approved)
 
@@ -10,6 +10,18 @@ To deliver edit + test in one day, v0 runs **in the host's FastAPI process on th
 - Task ownership is by host-supplied principal only; no device-side policy independent of the host.
 - Apply and test run are protected by per-action user approval bound to a fingerprint (diff / argv), not by a separate device authority.
 - Do not expose the router beyond the host's authenticated users.
+
+## Layering (enforced by `tests/test_code_attach_boundaries.py`, import scan only)
+
+| Layer | Modules | May | Must not |
+| --- | --- | --- | --- |
+| Host-facing | `router`, `providers`, `__init__` | HTTP translation, message-format conversion, call `Engine` | import `subprocess`, `os`, `pathlib`, `coding_agent`, tools/session, any model/network client |
+| Agent | `engine`, `session`, `tools` | task registry, loop, tools; only `tools` uses `subprocess` and `coding_agent` | import FastAPI/pydantic or any model/network client |
+| Host code | `complete`, `authorize`, `resolve_workspace` | the only place that talks to ChatGPT/Claude and decides who may open which folder | -- |
+
+## Real-model smoke run
+
+`examples/real_run.py` drives the Engine with any OpenAI-compatible endpoint (`OPENAI_API_KEY`, `MODEL`, optional `OPENAI_BASE_URL`), asking y/n on the terminal for every apply/test. NOT yet run against a real model.
 
 ## What the host writes (the whole adapter)
 

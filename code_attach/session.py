@@ -22,7 +22,6 @@ class Task:
         self.state = "RUNNING"
         self.events = []
         self.pending = None
-        self.fingerprint_of_request = None
         self._cancel = False
         self._cv = threading.Condition()
         self.messages = [{"role": "system", "text": SYSTEM}, {"role": "user", "text": instruction}]
