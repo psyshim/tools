@@ -27,7 +27,12 @@ class AgentTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory, tempfile.TemporaryDirectory() as external:
             outside = Path(external) / "secret"
             outside.write_text("secret")
-            (Path(directory) / "link").symlink_to(outside)
+            try:
+                (Path(directory) / "link").symlink_to(outside)
+            except OSError as exc:
+                if getattr(exc, "winerror", None) == 1314:
+                    self.skipTest("Windows symlink privilege unavailable")
+                raise
             ws = Workspace(directory)
             self.assertEqual(ws.list_directory(), [])
             with self.assertRaises(ValueError):
@@ -47,9 +52,9 @@ class AgentTests(unittest.TestCase):
                         headers["Authorization"] = "Bearer test-token"
                     return urllib.request.Request(uri, data=b'{"path":"a.txt"}', headers=headers)
                 with self.assertRaises(urllib.error.HTTPError) as caught:
-                    urllib.request.urlopen(request(False), timeout=2)
+                    urllib.request.urlopen(request(False), timeout=10)
                 self.assertEqual(caught.exception.code, 401)
-                with urllib.request.urlopen(request(True), timeout=2) as response:
+                with urllib.request.urlopen(request(True), timeout=10) as response:
                     self.assertEqual(json.load(response)["result"]["lines"], ["hello"])
             finally:
                 server.shutdown()

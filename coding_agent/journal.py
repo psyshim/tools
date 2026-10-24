@@ -2,22 +2,38 @@
 import hashlib
 import json
 import sqlite3
+import time
 from pathlib import Path
 
 class OperationConflict(Exception):
     pass
 
 class OperationJournal:
-    def __init__(self, filename):
+    def __init__(self, filename, check_same_thread=True):
         location = Path(filename)
         location.parent.mkdir(parents=True, exist_ok=True)
-        self.conn = sqlite3.connect(str(location), timeout=10, isolation_level=None)
-        self.conn.execute('PRAGMA busy_timeout=10000')
-        self.conn.execute('PRAGMA synchronous=FULL')
-        self.conn.execute('PRAGMA journal_mode=WAL')
-        self.conn.execute('''CREATE TABLE IF NOT EXISTS operations
-            (id TEXT PRIMARY KEY, digest TEXT NOT NULL, state TEXT NOT NULL,
-             result TEXT, CHECK(state IN ('PREPARED','UNKNOWN','SUCCEEDED','FAILED')))''')
+        self.conn = sqlite3.connect(str(location), timeout=10, isolation_level=None, check_same_thread=check_same_thread)
+        try:
+            self.conn.execute('PRAGMA busy_timeout=10000')
+            self.conn.execute('PRAGMA synchronous=FULL')
+            # Concurrent first-open can make the WAL mode switch return BUSY
+            # immediately, even with SQLite's busy timeout configured.
+            deadline = time.monotonic() + 10
+            while True:
+                try:
+                    self.conn.execute('PRAGMA journal_mode=WAL')
+                    break
+                except sqlite3.OperationalError as exc:
+                    code = getattr(exc, 'sqlite_errorcode', 0) & 0xff
+                    if code not in (sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED) or time.monotonic() >= deadline:
+                        raise
+                    time.sleep(.01)
+            self.conn.execute('''CREATE TABLE IF NOT EXISTS operations
+                (id TEXT PRIMARY KEY, digest TEXT NOT NULL, state TEXT NOT NULL,
+                 result TEXT, CHECK(state IN ('PREPARED','UNKNOWN','SUCCEEDED','FAILED')))''')
+        except BaseException:
+            self.conn.close()
+            raise
 
     def prepare(self, operation_id, request):
         if not isinstance(operation_id, str) or not 1 <= len(operation_id) <= 128:

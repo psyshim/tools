@@ -8,7 +8,7 @@ permissions:
 jobs:
   python-tests:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -18,7 +18,64 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+      - name: Install attachment test dependencies
+        run: python -m pip install fastapi httpx uvicorn pyflakes
       - name: Compile all Python modules
-        run: python -m compileall -q coding_agent host_mock tests
+        run: python -m compileall -q coding_agent host_mock code_attach coding_service device_agent protocol testkit packages hostkit_build kpi examples tests
       - name: Run entire test suite, including newly added tests
         run: python -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Build the pinned host kit
+        run: python -m hostkit_build.build_host_kit --out dist/host_kit
+      - name: Preserve host kit
+        uses: actions/upload-artifact@v4
+        with:
+          name: host-kit-${{ matrix.python-version }}
+          path: dist/host_kit
+      - name: Record contract and conformance evidence for this exact revision
+        if: always()
+        run: python -m examples.conformance_evidence --output conformance-evidence.json
+      - name: Preserve conformance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: conformance-${{ matrix.python-version }}
+          path: conformance-evidence.json
+  windows-processes:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install fastapi httpx uvicorn pyflakes
+      - name: Separate-process stacks, crash points and the Windows write guard
+        run: python -m examples.conformance_evidence --output conformance-windows.json
+      - name: Preserve evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: conformance-windows
+          path: conformance-windows.json
+  adversarial:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install package and test dependencies
+        run: python -m pip install ".[local,test]"
+      - name: Offline adversarial acceptance
+        run: python -m examples.adversarial_check --output adversarial-report.json
+      - name: Preserve measured evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: adversarial-${{ matrix.os }}
+          path: adversarial-report.json

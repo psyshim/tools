@@ -1,5 +1,7 @@
 # Upstream migration playbook — Sonnet code attachment to detached architecture
 
+> **Status (2026-10-24): Phases 0–7 are implemented on `sonnet-attach-boundaries`.** Evidence and per-phase acceptance: `docs/MIGRATION_PHASES_0_2_REPORT.md`, `docs/MIGRATION_PHASES_3_7_REPORT.md`. Experimental mutation stays off by default; see the capability table in the 3–7 report.
+
 **Status:** actionable migration plan, NOT proof of conformance.
 **Audience:** maintainer of `sonnet-attach-boundaries` and integrators.
 **Inputs:** [independent review](REVIEW_SONNET_ATTACH_INTEGRATION_2026-10-24.md), [ADR-001](ADR-001_SINGLE_AUTHORITY.md), [ADR-003](ADR-003_ELIMINATE_FAILURE_MODES.md), [ADR-004](ADR-004_THIN_HOST_SDK_BOUNDARY.md).

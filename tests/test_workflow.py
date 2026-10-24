@@ -50,7 +50,12 @@ class WorkflowTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as other:
             target = Path(other) / "secret"
             target.write_text("secret")
-            (self.root / "link.py").symlink_to(target)
+            try:
+                (self.root / "link.py").symlink_to(target)
+            except OSError as exc:
+                if getattr(exc, "winerror", None) == 1314:
+                    self.skipTest("Windows symlink privilege unavailable")
+                raise
             with self.assertRaises(ValueError):
                 self.engine.inspect("link.py")
 

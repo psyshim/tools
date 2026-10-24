@@ -1,0 +1,994 @@
+{
+ "_doc": "Denominator = the items listed under v0 (what this delivery commits to) and, separately, under deferred (consciously not in v0). Levels are COMPUTED by kpi.py from evidence, never self-reported: SPECIFIED=doc anchor found, IMPLEMENTED=code symbol found, TESTED=all listed tests pass now, INTEGRATED=evidence file of a real host/model run exists. Each level requires the previous one.",
+ "target_trials_per_scenario": 3,
+ "v0": [
+  {
+   "id": "R01",
+   "title": "List/read project files",
+   "doc": [
+    "docs/ATTACH_V0.md",
+    "Behavior guarantees"
+   ],
+   "code": [
+    [
+     "code_attach/tools.py",
+     "def t_read_file"
+    ],
+    [
+     "code_attach/tools.py",
+     "def t_list_dir"
+    ]
+   ],
+   "tests": [
+    "tests.test_code_attach_project.VirtualProjectTests.test_japanese_path_with_space_is_editable"
+   ],
+   "integration": null
+  },
+  {
+   "id": "R02",
+   "title": "Find files by glob in any depth",
+   "doc": [
+    "docs/ATTACH_V0.md",
+    "find_files"
+   ],
+   "code": [
+    [
+     "code_attach/tools.py",
+     "def t_find_files"
+    ]
+   ],
+   "tests": [
+    "tests.test_code_attach_project.VirtualProjectTests.test_search_is_bounded_and_skips_noise",
+    "tests.test_code_attach_project.VirtualProjectTests.test_finds_setting_in_unexpected_location_and_edits_it"
+   ],
+   "integration": null
+  },
+  {
+   "id": "R03",
+   "title": "Search text in unexpected places, bounded, noise skipped",
+   "doc": [
+    "docs/ATTACH_V0.md",
+    "search_text"
+   ],
+   "code": [
+    [
+     "code_attach/tools.py",
+     "def t_search_text"
+    ]
+   ],
+   "tests": [
+    "tests.test_code_attach_project.VirtualProjectTests.test_finds_setting_in_unexpected_location_and_edits_it",
+    "tests.test_code_attach_project.VirtualProjectTests.test_search_is_bounded_and_skips_noise"
+   ],
+   "integration": null
+  },
+  {
+   "id": "R04",
+   "title": "Edit proposal writes nothing before approval",
+   "doc": [
+    "docs/ATTACH_V0.md",
+    "nothing is written before approval"
+   ],
+   "code": [
+    [
+     "code_attach/tools.py",
+     "def t_propose_edit"
+    ]
+   ],
+   "tests": [
+    "tests.test_code_attach.CodeAttachTests.test_fix_and_test_with_approvals"
+   ],
+   "integration": null
+  },
+  {
+   "id": "R05",
+   "title": "New-file proposal and creation",
+   "doc": [
+    "docs/HOST_HANDOFF.md",
+    "propose_new_file"
+   ],
+   "code": [
+    [
+     "code_attach/tools.py",
+     "def t_propose_new_file"
+    ]
+   ],
+   "tests": [
+    "tests.test_code_attach_abnormal.NormalPaths.test_new_file_creation"
+   ],
+   "integration": null
+  },
+  {
+   "id": "R06",
+   "title": "Approved edit lands on disk (single and multi-file)",
+   "doc": [
+    "docs/ATTACH_V0.md",
+    "Behavior guarantees"
+   ],
+   "code": [
+    [
+     "code_attach/tools.py",
+     "def t_apply_proposal"
+    ]
+   ],
+   "tests": [
+    "tests.test_code_attach_abnormal.NormalPaths.test_fix_apply_and_passing_tests",
+    "tests.test_code_attach_project.VirtualProjectTests.test_edits_across_several_files_all_land"
+   ],
+   "integration": null
+  },
+  {
+   "id": "R07",
+   "title": "Stale file gives CONFLICT, never overwrite",
+   "doc": [
+    "docs/ATTACH_V0.md",
+    "CONFLICT"
+   ],
+   "code": [
+    [
+     "code_attach/tools.py",
+     "CONFLICT"
+    ]
+   ],
+   "tests": [
+    "tests.test_code_attach_abnormal.ApprovalAbnormal.test_stale_file_yields_conflict_not_overwrite"
+   ],
+   "integration": null
+  },
+  {
+   "id": "R08",
+   "title": "CRLF files edited with LF text keep CRLF",
+   "doc": [
+    "docs/ATTACH_V0.md",
+    "CRLF"
+   ],
+   "code": [
+    [
+     "code_attach/tools.py",
+     "CRLF"
+    ]
+   ],
+   "tests": [
+    "tests.test_code_attach_project.VirtualProjectTests.test_crlf_file_edit_applies_and_keeps_crlf"
+   ],
+   "integration": null
+  },
+  {
+   "id": "R09",
+   "title": "Approval bound to fingerprint; reject/duplicate/wrong fingerprint safe",
+   "doc": [
+    "docs/ATTACH_V0.md",
+    "fingerprint"
+   ],
+   "code": [
+    [
+     "coding_service/loop.py",
+     "def decide"
+    ]
+   ],
+   "tests": [
+    "tests.test_code_attach_abnormal.ApprovalAbnormal.test_reject_leaves_file_and_reports_not_approved",
+    "tests.test_code_attach_abnormal.ApprovalAbnormal.test_wrong_fingerprint_and_duplicate_decision",
+    "tests.test_code_attach_project.VirtualProjectTests.test_denied_approval_changes_nothing_in_the_tree"
+   ],
+   "integration": null
+  },
+  {
+   "id": "R10",
+   "title": "Run allowlisted tests with approval; model cannot pick argv",
+   "doc": [
+    "docs/ATTACH_V0.md",
+    "test_commands"
+   ],
+   "code": [
+    [
+     "code_attach/tools.py",
+     "def t_run_tests"
+    ]
+   ],
+   "tests": [
+    "tests.test_code_attach_abnormal.TestRunAbnormal.test_model_cannot_choose_its_own_command",
+    "tests.test_code_attach.CodeAttachTests.test_run_tests_unavailable_without_config"
+   ],
+   "integration": null
+  },
+  {
+   "id": "R11",
+   "title": "Test results honest: PASS/FAIL/TIMEOUT/UNKNOWN, bounded output",
+   "doc": [
+    "docs/ATTACH_V0.md",
+    "PASS"
+   ],
+   "code": [
+    [
+     "code_attach/testrun.py",
+     "TIMEOUT"
+    ]
+   ],
+   "tests": [
+    "tests.test_code_attach_abnormal.TestRunAbnormal.test_failing_tests_report_fail_with_exit_code",
+    "tests.test_code_attach_abnormal.TestRunAbnormal.test_timeout_is_reported",
+    "tests.test_code_attach_abnormal.TestRunAbnormal.test_missing_executable_is_unknown",
+    "tests.test_code_attach_abnormal.TestRunAbnormal.test_huge_output_is_bounded"
+   ],
+   "integration": null
+  },
+  {
+   "id": "R12",
+   "title": "Write failing test, fix bug, test passes",
+   "doc": [
+    "docs/ATTACH_V0.md",
+    "Behavior guarantees"
+   ],
+   "code": [
+    [
+     "coding_service/loop.py",
+     "class Task"
+    ]
+   ],
+   "tests": [
+    "tests.test_code_attach_project.VirtualProjectTests.test_write_failing_test_fix_bug_then_pass"
+   ],
+   "integration": null
+  },
+  {
+   "id": "R13",
+   "title": "Escapes, secrets, .git refused (read, propose, search)",
+   "doc": [
+    "docs/ATTACH_V0.md",
+    ".env"
+   ],
+   "code": [
+    [
+     "coding_agent/workspace.py",
+     "restricted path"
+    ]
+   ],
+   "tests": [
+    "tests.test_code_attach_abnormal.PathAbnormal.test_escapes_and_secrets_refused_on_read_and_propose",
+    "tests.test_code_attach_project.VirtualProjectTests.test_search_cannot_leave_workspace_or_read_git"
+   ],
+   "integration": null
+  },
+  {
+   "id": "R14",
+   "title": "Other users cannot observe/decide/cancel; idempotency; capacity",
+   "doc": [
+    "docs/ATTACH_V0.md",
+    "404"
+   ],
+   "code": [
+    [
+     "code_attach/engine.py",
+     "class Engine"
+    ]
+   ],
+   "tests": [
+    "tests.test_code_attach_abnormal.OwnershipAbnormal.test_other_principal_cannot_observe_decide_or_cancel",
+    "tests.test_code_attach_abnormal.OwnershipAbnormal.test_idempotency_and_capacity",
+    "tests.test_code_attach.CodeAttachTests.test_access_control_and_idempotency"
+   ],
+   "integration": null
+  },
+  {
+   "id": "R15",
+   "title": "Cancel, including while awaiting approval",
+   "doc": [
+    "docs/ATTACH_V0.md",
+    "cancel"
+   ],
+   "code": [
+    [
+     "coding_service/loop.py",
+     "def cancel"
+    ]
+   ],
+   "tests": [
+    "tests.test_code_attach_abnormal.ApprovalAbnormal.test_cancel_while_awaiting_approval"
+   ],
+   "integration": null
+  },
+  {
+   "id": "R16",
+   "title": "Model failures end FAILED, never COMPLETED (exception, bad args, loop)",
+   "doc": [
+    "docs/ATTACH_V0.md",
+    "FAILED"
+   ],
+   "code": [
+    [
+     "coding_service/loop.py",
+     "step limit"
+    ]
+   ],
+   "tests": [
+    "tests.test_code_attach_abnormal.ModelAbnormal.test_model_exception_is_failed_not_completed",
+    "tests.test_code_attach_abnormal.ModelAbnormal.test_endless_tool_loop_hits_step_limit",
+    "tests.test_code_attach_abnormal.ModelAbnormal.test_malformed_arguments_are_errors",
+    "tests.test_code_attach_abnormal.ModelAbnormal.test_unknown_tool_is_error_and_loop_continues",
+    "tests.test_code_attach_abnormal.ModelAbnormal.test_tool_call_without_id_gets_an_id_and_runs"
+   ],
+   "integration": null
+  },
+  {
+   "id": "R17",
+   "title": "Provider converters (OpenAI and Anthropic shapes)",
+   "doc": [
+    "docs/ATTACH_V0.md",
+    "to_anthropic"
+   ],
+   "code": [
+    [
+     "coding_service/providers.py",
+     "def to_openai"
+    ],
+    [
+     "coding_service/providers.py",
+     "def to_anthropic"
+    ]
+   ],
+   "tests": [
+    "tests.test_code_attach.CodeAttachTests.test_provider_converters_roundtrip"
+   ],
+   "integration": null
+  },
+  {
+   "id": "R18",
+   "title": "FastAPI router HTTP surface",
+   "doc": [
+    "docs/ATTACH_V0.md",
+    "HTTP surface"
+   ],
+   "code": [
+    [
+     "code_attach/router.py",
+     "def make_router"
+    ]
+   ],
+   "tests": [
+    "tests.test_code_attach.CodeAttachTests.test_fix_and_test_with_approvals",
+    "tests.test_code_attach.CodeAttachTests.test_rejected_apply_does_not_write"
+   ],
+   "integration": null
+  },
+  {
+   "id": "R19",
+   "title": "Layering: host layer has no execution; agent layer has no HTTP/network",
+   "doc": [
+    "docs/ATTACH_V0.md",
+    "Layering"
+   ],
+   "code": [
+    [
+     "code_attach/engine.py",
+     "class Engine"
+    ]
+   ],
+   "tests": [
+    "tests.test_code_attach_boundaries.BoundaryTests.test_host_layer_has_no_execution_or_agent_internals",
+    "tests.test_code_attach_boundaries.BoundaryTests.test_agent_layer_has_no_http_or_network",
+    "tests.test_code_attach_boundaries.BoundaryTests.test_every_module_is_classified"
+   ],
+   "integration": null
+  },
+  {
+   "id": "R20",
+   "title": "Wired into the real chat app (FastAPI + React) and used end to end",
+   "doc": [
+    "docs/ATTACH_V0.md",
+    "What the host writes"
+   ],
+   "code": [],
+   "tests": [],
+   "integration": "kpi/evidence/host_integration.md"
+  },
+  {
+   "id": "R21",
+   "title": "Real model completes the scenarios (see real-model KPI)",
+   "doc": [
+    "docs/ATTACH_V0.md",
+    "Real-model smoke run"
+   ],
+   "code": [
+    [
+     "kpi/real_eval.py",
+     "SCENARIOS"
+    ]
+   ],
+   "tests": [
+    "tests.test_kpi.RealEvalHarnessTests.test_liar_model_is_scored_fail",
+    "tests.test_kpi.RealEvalHarnessTests.test_positive_control_passes"
+   ],
+   "integration": "kpi/evidence/real_model_runs.md"
+  },
+  {
+   "id": "R22",
+   "title": "One-page host handoff (adapter-only wiring recipe)",
+   "doc": [
+    "docs/HOST_HANDOFF.md",
+    "Write three functions"
+   ],
+   "code": [
+    [
+     "code_attach/router.py",
+     "def make_router"
+    ]
+   ],
+   "tests": [
+    "tests.test_code_attach.CodeAttachTests.test_fix_and_test_with_approvals"
+   ],
+   "integration": null
+  },
+  {
+   "id": "R23",
+   "title": "No absolute path, home dir or user name in frontend events, model context or logs",
+   "doc": [
+    "docs/HOST_HANDOFF.md",
+    "never leave the process"
+   ],
+   "code": [
+    [
+     "code_attach/tools.py",
+     "def scrub"
+    ],
+    [
+     "code_attach/engine.py",
+     "def _ref"
+    ]
+   ],
+   "tests": [
+    "tests.test_code_attach_privacy.PrivacyTests.test_no_personal_or_absolute_path_in_events_sink_or_model_context",
+    "tests.test_code_attach_privacy.PrivacyTests.test_started_record_is_private_and_uses_opaque_refs",
+    "tests.test_code_attach_privacy.PrivacyTests.test_oserror_text_is_scrubbed"
+   ],
+   "integration": null
+  },
+  {
+   "id": "R24",
+   "title": "Audit fixes: concurrent task cap, clean test env, tree-kill timeout, bad workspace 404, glob **",
+   "doc": [
+    "docs/AUDIT_2026-10-24.md",
+    "FIXED"
+   ],
+   "code": [
+    [
+     "code_attach/testrun.py",
+     "SAFE_ENV"
+    ],
+    [
+     "code_attach/engine.py",
+     "def _evict_finished"
+    ]
+   ],
+   "tests": [
+    "tests.test_code_attach_audit.TaskCapacity.test_finished_tasks_do_not_consume_capacity",
+    "tests.test_code_attach_audit.TaskCapacity.test_concurrently_active_tasks_are_still_capped",
+    "tests.test_code_attach_audit.TestRunHardening.test_host_secrets_are_not_passed_to_test_commands",
+    "tests.test_code_attach_audit.TestRunHardening.test_timeout_kills_the_process_tree_and_returns_promptly",
+    "tests.test_code_attach_audit.ScrubForms.test_repr_escaped_lowercase_and_posix_spellings_are_scrubbed",
+    "tests.test_code_attach_audit.GlobSemantics.test_double_star_matches_zero_or_more_directories",
+    "tests.test_code_attach_audit.TaskCapacity.test_missing_workspace_is_a_typed_error"
+   ],
+   "integration": null
+  },
+  {
+   "id": "R25",
+   "title": "Audit batch 2: tolerant of sloppy models, cancel kills tests, non-blocking log writes, bounded model context, no personal log path",
+   "doc": [
+    "docs/AUDIT_2026-10-24.md",
+    "approval_expired"
+   ],
+   "code": [
+    [
+     "coding_service/loop.py",
+     "class LogUnavailable"
+    ],
+    [
+     "code_attach/activity.py",
+     "display_path"
+    ]
+   ],
+   "tests": [
+    "tests.test_code_attach_audit2.SloppyModel.test_call_without_id_is_executed_and_completes",
+    "tests.test_code_attach_audit2.SloppyModel.test_garbage_tool_calls_become_errors_not_crashes",
+    "tests.test_code_attach_audit2.Cancellation.test_cancel_kills_a_running_test_promptly",
+    "tests.test_code_attach_audit2.LockingAndLogging.test_polling_is_not_blocked_by_a_slow_log_write",
+    "tests.test_code_attach_audit2.LockingAndLogging.test_concurrent_decisions_and_events_do_not_deadlock",
+    "tests.test_code_attach_audit2.LockingAndLogging.test_only_log_failures_map_to_503",
+    "tests.test_code_attach_audit2.BoundedContext.test_old_tool_results_are_shortened_for_the_model_only",
+    "tests.test_code_attach_audit2.ApprovalAndRetry.test_unanswered_approval_expires_visibly",
+    "tests.test_code_attach_audit2.ApprovalAndRetry.test_transient_os_error_does_not_burn_the_proposal",
+    "tests.test_code_attach_audit2.SearchAndScan.test_start_line_pages_one_file_and_applies_to_every_file_in_a_directory",
+    "tests.test_code_attach_audit2.SearchAndScan.test_scan_limit_is_reported_not_silent",
+    "tests.test_code_attach_audit2.PathDisplay.test_display_path_never_contains_the_user_name_or_drive"
+   ],
+   "integration": null
+  },
+  {
+   "id": "R26",
+   "title": "Maintainability: single-responsibility modules, registry guard rails, lint, maintainer guide",
+   "doc": [
+    "docs/MAINTAINING_CODE_ATTACH.md",
+    "Adding a tool (checklist)"
+   ],
+   "code": [
+    [
+     "code_attach/testrun.py",
+     "class CommandRunner"
+    ],
+    [
+     "code_attach/privacy.py",
+     "class Scrubber"
+    ],
+    [
+     "code_attach/schemas.py",
+     "EFFECT_TOOLS"
+    ]
+   ],
+   "tests": [
+    "tests.test_code_attach_registry.RegistryTests.test_schemas_and_methods_pair_up_exactly",
+    "tests.test_code_attach_registry.RegistryTests.test_each_schema_is_well_formed_and_matches_its_signature",
+    "tests.test_code_attach_registry.RegistryTests.test_effect_tools_are_exactly_those_that_say_they_need_approval",
+    "tests.test_code_attach_registry.RegistryTests.test_every_effect_tool_can_describe_itself_for_the_approval_card",
+    "tests.test_code_attach_registry.RegistryTests.test_proposing_tools_never_write",
+    "tests.test_code_attach_registry.HygieneTests.test_no_unused_imports_or_names_in_code_attach",
+    "tests.test_code_attach_registry.HygieneTests.test_only_testrun_starts_processes",
+    "tests.test_code_attach_boundaries.BoundaryTests.test_every_module_is_classified"
+   ],
+   "integration": null
+  },
+  {
+   "id": "R27",
+   "title": "Adversarial robustness: hostile paths/args/models/races/HTTP/process output (22 attack tests)",
+   "doc": [
+    "docs/AUDIT_2026-10-24.md",
+    "Adversarial round"
+   ],
+   "code": [
+    [
+     "coding_service/loop.py",
+     "MAX_CALLS_PER_TURN"
+    ],
+    [
+     "code_attach/router.py",
+     "async def read_model"
+    ]
+   ],
+   "tests": [
+    "tests.test_code_attach_adversarial.PathAttackMatrix.test_read_and_search_surfaces_never_leak_or_escape",
+    "tests.test_code_attach_adversarial.PathAttackMatrix.test_proposal_surfaces_never_write_or_escape",
+    "tests.test_code_attach_adversarial.PathAttackMatrix.test_applying_every_accepted_hostile_proposal_still_stays_inside",
+    "tests.test_code_attach_adversarial.ArgumentFuzz.test_garbage_arguments_only_raise_handled_exceptions",
+    "tests.test_code_attach_adversarial.ArgumentFuzz.test_garbage_ids_and_names_for_effect_tools",
+    "tests.test_code_attach_adversarial.ArgumentFuzz.test_call_rejects_non_dict_arguments_and_private_names",
+    "tests.test_code_attach_adversarial.HostileModel.test_prompt_injection_in_a_file_cannot_trigger_effects",
+    "tests.test_code_attach_adversarial.HostileModel.test_too_many_tool_calls_in_one_reply_are_capped",
+    "tests.test_code_attach_adversarial.HostileModel.test_enormous_assistant_text_is_bounded_in_events",
+    "tests.test_code_attach_adversarial.HostileModel.test_huge_or_deeply_nested_arguments_do_not_break_the_host_conversion",
+    "tests.test_code_attach_adversarial.HostileModel.test_unknown_tool_names_never_create_approval_cards",
+    "tests.test_code_attach_adversarial.Races.test_double_apply_applies_exactly_once",
+    "tests.test_code_attach_adversarial.Races.test_two_proposals_on_the_same_base_one_wins_one_conflicts_no_corruption",
+    "tests.test_code_attach_adversarial.Races.test_simultaneous_decisions_exactly_one_wins",
+    "tests.test_code_attach_adversarial.Races.test_cancel_racing_completion_always_ends_consistently_and_without_thread_errors",
+    "tests.test_code_attach_adversarial.Races.test_many_parallel_tasks_with_small_capacity_never_deadlock",
+    "tests.test_code_attach_adversarial.HostileHttp.test_malformed_requests_never_produce_a_500",
+    "tests.test_code_attach_adversarial.HostileHttp.test_unauthenticated_and_foreign_access_is_refused_on_every_route",
+    "tests.test_code_attach_adversarial.HostileHttp.test_lone_surrogates_and_control_characters_in_input_do_not_break_logging",
+    "tests.test_code_attach_adversarial.ProvidersAndScrubber.test_malformed_model_responses_are_tolerated",
+    "tests.test_code_attach_adversarial.ProvidersAndScrubber.test_scrubber_is_fast_on_large_hostile_input_and_handles_odd_paths",
+    "tests.test_code_attach_adversarial.ProcessAbuse.test_hostile_test_output_and_behaviour_are_contained"
+   ],
+   "integration": null
+  },
+  {
+   "id": "R28",
+   "title": "Weak-spot coverage: teaching edit errors, navigation, per-command settings, parsed results, line/batch/notebook edits, undo, project recon",
+   "doc": [
+    "docs/AUDIT_2026-10-24.md",
+    "Weak-spot round"
+   ],
+   "code": [
+    [
+     "code_attach/matching.py",
+     "def locate"
+    ],
+    [
+     "code_attach/tools_edit.py",
+     "def t_propose_edits"
+    ],
+    [
+     "code_attach/tools_nav.py",
+     "def t_find_symbol"
+    ],
+    [
+     "code_attach/detect.py",
+     "def suggest_test_commands"
+    ],
+    [
+     "code_attach/testparse.py",
+     "def parse"
+    ]
+   ],
+   "tests": [
+    "tests.test_code_attach_coverage.BatchEdits.test_external_change_before_apply_conflicts_and_changes_nothing",
+    "tests.test_code_attach_coverage.BatchEdits.test_failure_midway_rolls_back_every_file",
+    "tests.test_code_attach_coverage.BatchEdits.test_limits_and_shapes",
+    "tests.test_code_attach_coverage.BatchEdits.test_one_bad_edit_rejects_the_whole_proposal_with_its_position",
+    "tests.test_code_attach_coverage.BatchEdits.test_rename_across_files_is_one_approval_and_one_result",
+    "tests.test_code_attach_coverage.BatchEdits.test_rollback_failure_is_reported_as_needing_reconciliation",
+    "tests.test_code_attach_coverage.Commands.test_compiler_style_output_yields_diagnostics",
+    "tests.test_code_attach_coverage.Commands.test_cwd_that_is_not_a_directory_reports_unknown",
+    "tests.test_code_attach_coverage.Commands.test_invalid_command_tables_are_rejected_up_front",
+    "tests.test_code_attach_coverage.Commands.test_model_sees_the_available_command_names_and_descriptions",
+    "tests.test_code_attach_coverage.Commands.test_per_command_cwd_timeout_and_env",
+    "tests.test_code_attach_coverage.Commands.test_results_are_parsed_into_failures_with_file_and_line",
+    "tests.test_code_attach_coverage.EditDiagnostics.test_duplicate_failure_lists_every_line",
+    "tests.test_code_attach_coverage.EditDiagnostics.test_lf_old_text_matches_crlf_and_mixed_files_and_keeps_endings_consistent",
+    "tests.test_code_attach_coverage.EditDiagnostics.test_missing_path_suggests_similar_names",
+    "tests.test_code_attach_coverage.EditDiagnostics.test_near_miss_points_at_the_closest_text",
+    "tests.test_code_attach_coverage.EditDiagnostics.test_nothing_similar_says_so_plainly",
+    "tests.test_code_attach_coverage.EditDiagnostics.test_single_line_replaced_by_several_lines_in_a_crlf_file_adds_no_bare_lf",
+    "tests.test_code_attach_coverage.EditDiagnostics.test_tab_vs_space_failure_shows_the_real_text_and_line",
+    "tests.test_code_attach_coverage.EndToEnd.test_model_navigates_edits_atomically_runs_tests_and_undoes",
+    "tests.test_code_attach_coverage.LineRangeEdits.test_crlf_and_duplicates_elsewhere_are_handled",
+    "tests.test_code_attach_coverage.LineRangeEdits.test_expectation_mismatch_shows_the_real_lines_and_out_of_range_is_clear",
+    "tests.test_code_attach_coverage.LineRangeEdits.test_replace_lines_happy_path_delete_and_insertion_growth",
+    "tests.test_code_attach_coverage.LineRangeEdits.test_stale_file_conflicts_instead_of_overwriting",
+    "tests.test_code_attach_coverage.Navigation.test_find_symbol_separates_definitions_from_references_across_languages",
+    "tests.test_code_attach_coverage.Navigation.test_outline_file_tool",
+    "tests.test_code_attach_coverage.Navigation.test_project_overview_includes_what_the_host_enabled",
+    "tests.test_code_attach_coverage.Navigation.test_qualified_names_and_kind_filter",
+    "tests.test_code_attach_coverage.Navigation.test_search_whole_word_terms_and_column",
+    "tests.test_code_attach_coverage.Navigation.test_symbol_search_skips_noise_directories",
+    "tests.test_code_attach_coverage.Navigation.test_very_long_lines_are_excerpted_and_readable_by_column",
+    "tests.test_code_attach_coverage.Notebooks.test_bad_input_is_refused_cleanly",
+    "tests.test_code_attach_coverage.Notebooks.test_insert_and_delete",
+    "tests.test_code_attach_coverage.Notebooks.test_read_notebook_lists_cells",
+    "tests.test_code_attach_coverage.Notebooks.test_replace_clears_stale_outputs_and_keeps_the_file_layout",
+    "tests.test_code_attach_coverage.Undo.test_undo_is_refused_after_someone_else_changed_the_file",
+    "tests.test_code_attach_coverage.Undo.test_undo_of_a_created_file_and_of_a_batch",
+    "tests.test_code_attach_coverage.Undo.test_undo_restores_exact_bytes_and_can_itself_be_undone",
+    "tests.test_code_attach_coverage.Undo.test_unknown_ids_and_history_bounds",
+    "tests.test_code_attach_parsing.Detection.test_go_rust_java_make_php_and_empty",
+    "tests.test_code_attach_parsing.Detection.test_hostile_manifests_do_not_break_detection",
+    "tests.test_code_attach_parsing.Detection.test_python_node_and_dotnet_in_one_repo",
+    "tests.test_code_attach_parsing.Detection.test_python_without_pytest_uses_unittest_and_venv_interpreter",
+    "tests.test_code_attach_parsing.Detection.test_suggestions_are_never_executed_by_detection",
+    "tests.test_code_attach_parsing.Outlines.test_broken_python_still_yields_a_heuristic_outline",
+    "tests.test_code_attach_parsing.Outlines.test_language_detection",
+    "tests.test_code_attach_parsing.Outlines.test_other_languages",
+    "tests.test_code_attach_parsing.Outlines.test_outline_is_bounded_and_survives_hostile_input",
+    "tests.test_code_attach_parsing.Outlines.test_python_uses_the_real_parser_with_qualified_names",
+    "tests.test_code_attach_parsing.Outlines.test_word_pattern_is_whole_word_and_regex_safe",
+    "tests.test_code_attach_parsing.ParsingOutput.test_diagnostics_from_compilers_and_linters",
+    "tests.test_code_attach_parsing.ParsingOutput.test_other_runners",
+    "tests.test_code_attach_parsing.ParsingOutput.test_parser_never_raises_and_stays_bounded",
+    "tests.test_code_attach_parsing.ParsingOutput.test_pytest_variants",
+    "tests.test_code_attach_parsing.ParsingOutput.test_real_unittest_failure_output",
+    "tests.test_code_attach_parsing.ParsingOutput.test_unittest_ok"
+   ],
+   "integration": null
+  },
+  {
+   "id": "R29",
+   "title": "Phase 0 safety posture: read/propose by default, mutation only by explicit opt-in, prototype labelling",
+   "doc": [
+    "docs/HOST_HANDOFF.md",
+    "STATUS: PROTOTYPE"
+   ],
+   "code": [
+    [
+     "code_attach/router.py",
+     "allow_mutation=False"
+    ],
+    [
+     "code_attach/tools.py",
+     "_require_mutation"
+    ]
+   ],
+   "tests": [
+    "tests.test_code_attach_posture.Posture.test_default_router_offers_no_mutation_and_says_so",
+    "tests.test_code_attach_posture.Posture.test_tools_shown_to_the_model_exclude_every_effect",
+    "tests.test_code_attach_posture.Posture.test_a_model_that_tries_anyway_gets_errors_and_no_approval_card",
+    "tests.test_code_attach_posture.Posture.test_even_direct_calls_and_forged_decisions_cannot_mutate",
+    "tests.test_code_attach_posture.Posture.test_system_prompt_tells_the_model_it_can_only_propose",
+    "tests.test_code_attach_posture.Posture.test_explicit_opt_in_restores_the_approval_flow"
+   ],
+   "integration": null
+  },
+  {
+   "id": "R30",
+   "title": "Public protocol contract + executable mock + shared fixtures (migration phase 2)",
+   "doc": [
+    "docs/MIGRATION_PHASES_0_2_REPORT.md",
+    "Gate P2"
+   ],
+   "code": [
+    [
+     "protocol/schema.py",
+     "def validate_task_request"
+    ],
+    [
+     "testkit/mock/service.py",
+     "class MockCodingService"
+    ],
+    [
+     "code_attach/protocol_router.py",
+     "def make_protocol_router"
+    ],
+    [
+     "coding_service/wire.py",
+     "def to_protocol_events"
+    ]
+   ],
+   "tests": [
+    "tests.test_protocol_contract.BoundaryTests.test_mock_shares_no_code_with_the_real_service",
+    "tests.test_protocol_contract.BoundaryTests.test_protocol_imports_only_stdlib_and_itself",
+    "tests.test_protocol_contract.BoundaryTests.test_testkit_depends_only_on_protocol_and_stdlib",
+    "tests.test_protocol_contract.FixtureTests.test_every_fixture_behaves_as_declared",
+    "tests.test_protocol_contract.FixtureTests.test_every_invalid_fixture_names_its_expected_error_code",
+    "tests.test_protocol_contract.FixtureTests.test_fixtures_cover_every_event_type_and_a_refusal_for_each_kind",
+    "tests.test_protocol_contract.VersioningTests.test_error_envelopes_validate_and_codes_map_to_statuses",
+    "tests.test_protocol_contract.VersioningTests.test_events_from_a_future_minor_version_still_validate",
+    "tests.test_protocol_contract.VersioningTests.test_major_mismatch_fails_closed_and_minor_is_tolerated",
+    "tests.test_protocol_conformance.MockConformance.test_cursor_is_gap_free_stable_and_replayable",
+    "tests.test_protocol_conformance.RealReadProposeConformance.test_cursor_is_gap_free_stable_and_replayable",
+    "tests.test_protocol_conformance.RealExperimentalConformance.test_experimental_mutation_yields_a_receipt_only_after_approval",
+    "tests.test_protocol_conformance.RealReadProposeConformance.test_other_major_protocol_version_fails_closed_on_every_route",
+    "tests.test_protocol_conformance.MockConformance.test_other_major_protocol_version_fails_closed_on_every_route"
+   ],
+   "integration": null
+  },
+  {
+   "id": "R31",
+   "title": "Phase 3: separately installable powerless host client, sample host, isolation proof",
+   "doc": [
+    "packages/host_client/README.md",
+    "What the host writes"
+   ],
+   "code": [
+    [
+     "packages/host_client/host_client/gateway.py",
+     "class AgentGateway"
+    ],
+    [
+     "hostkit_build/build_host_kit.py",
+     "def build"
+    ],
+    [
+     "examples/sample_host/adapter.py",
+     "class CodingAdapter"
+    ]
+   ],
+   "tests": [
+    "tests.test_host_client.Failure.test_a_service_that_violates_the_contract_fails_closed",
+    "tests.test_host_client.Failure.test_observation_times_out_with_a_resumable_position",
+    "tests.test_host_client.Failure.test_other_major_version_means_unavailable_never_a_fallback",
+    "tests.test_host_client.Failure.test_oversized_responses_are_refused",
+    "tests.test_host_client.Failure.test_rejected_service_credential_is_a_configuration_problem_not_a_user_problem",
+    "tests.test_host_client.Failure.test_service_absent_never_raises_from_availability_and_start_is_typed",
+    "tests.test_host_client.Failure.test_transient_gateway_errors_are_retried_with_backoff_then_surface",
+    "tests.test_host_client.InputHygiene.test_local_validation_blocks_injection_before_any_request",
+    "tests.test_host_client.InputHygiene.test_unicode_principals_survive_the_header_round_trip",
+    "tests.test_host_client.InputHygiene.test_untrusted_event_content_is_cleaned_bounded_and_escapable",
+    "tests.test_host_client.Kit.test_build_is_reproducible_and_verifiable",
+    "tests.test_host_client.Kit.test_host_client_sources_import_nothing_powerful",
+    "tests.test_host_client.Kit.test_installed_kit_works_with_no_agent_or_web_framework_present",
+    "tests.test_host_client.Lifecycle.test_a_missing_event_produces_a_visible_gap_marker",
+    "tests.test_host_client.Lifecycle.test_availability_reports_capabilities_without_raising",
+    "tests.test_host_client.Lifecycle.test_cancel_reports_the_services_state_and_never_invents_one",
+    "tests.test_host_client.Lifecycle.test_decision_flow_and_an_ambiguous_retry_is_resolved_from_the_log",
+    "tests.test_host_client.Lifecycle.test_duplicate_delivery_is_rendered_once",
+    "tests.test_host_client.Lifecycle.test_expired_cursor_restarts_from_what_the_service_still_has",
+    "tests.test_host_client.Lifecycle.test_other_user_cannot_observe_cancel_or_decide",
+    "tests.test_host_client.Lifecycle.test_propose_flow_streams_safe_events_to_a_terminal_state",
+    "tests.test_host_client.Lifecycle.test_resume_continues_after_the_last_rendered_event",
+    "tests.test_host_client.Lifecycle.test_revocation_stops_delivery_immediately",
+    "tests.test_host_client.Lifecycle.test_the_same_message_is_the_same_task_even_after_a_lost_response",
+    "tests.test_host_client.Lifecycle.test_wrong_fingerprint_is_not_accepted",
+    "tests.test_host_client.OverSockets.test_full_flow_over_http",
+    "tests.test_sample_host.ClientAgainstTheRealService.test_experimental_mutation_flow_through_the_client",
+    "tests.test_sample_host.ClientAgainstTheRealService.test_other_users_and_unknown_workspaces_are_refused_by_the_service",
+    "tests.test_sample_host.ClientAgainstTheRealService.test_propose_flow_end_to_end_without_any_mutation",
+    "tests.test_sample_host.ClientAgainstTheRealService.test_wrong_service_credential_is_reported_as_a_configuration_problem",
+    "tests.test_sample_host.DetachableHost.test_full_flow_through_the_host_with_the_mock",
+    "tests.test_sample_host.DetachableHost.test_host_boots_and_chats_with_the_coding_service_absent",
+    "tests.test_sample_host.DetachableHost.test_the_host_acl_is_the_hosts_own_decision_and_costs_no_network_call"
+   ],
+   "integration": null
+  },
+  {
+   "id": "R32",
+   "title": "Phase 5: durable Coding Service as its own process (tasks/events survive kill, idempotent, owner-scoped)",
+   "doc": [
+    "docs/OPERATOR_GUIDE.md",
+    "Restart behaviour"
+   ],
+   "code": [
+    [
+     "coding_service/store.py",
+     "class TaskStore"
+    ],
+    [
+     "coding_service/manager.py",
+     "class DurableManager"
+    ],
+    [
+     "coding_service/app.py",
+     "def create_app"
+    ]
+   ],
+   "tests": [
+    "tests.test_service_recovery.RestartKeepsMeaning.test_cursor_identity_idempotency_and_ownership_survive_a_hard_kill",
+    "tests.test_service_recovery.RestartKeepsMeaning.test_a_task_killed_while_running_is_closed_explicitly_with_no_gap_or_rewrite",
+    "tests.test_service_recovery.RestartKeepsMeaning.test_crash_right_after_acceptance_neither_loses_nor_duplicates_the_task",
+    "tests.test_service_recovery.StoreProblems.test_a_corrupt_store_stops_the_service_with_a_clear_message_instead_of_serving_nonsense"
+   ],
+   "integration": null
+  },
+  {
+   "id": "R33",
+   "title": "Phase 4: Device Agent is the only local executor; grants decide folders and capabilities; physically separate process trees",
+   "doc": [
+    "docs/OPERATOR_GUIDE.md",
+    "Device Agent"
+   ],
+   "code": [
+    [
+     "device_agent/core.py",
+     "class DeviceService"
+    ],
+    [
+     "device_agent/config.py",
+     "def load_config"
+    ],
+    [
+     "coding_service/device_client.py",
+     "class DeviceClient"
+    ]
+   ],
+   "tests": [
+    "tests.test_service_device_processes.SeparateProcessStack.test_trees_physically_separate_the_capabilities",
+    "tests.test_service_device_processes.SeparateProcessStack.test_propose_flow_across_three_isolated_parties",
+    "tests.test_service_device_processes.SeparateProcessStack.test_the_device_refuses_what_the_wire_cannot_ask_for_and_nothing_private_leaks",
+    "tests.test_service_device_processes.SeparateProcessStack.test_hosts_are_isolated_from_each_other",
+    "tests.test_service_device_processes.DeviceBoundary.test_malformed_grants_stop_the_device_before_it_listens",
+    "tests.test_service_device_processes.DeviceBoundary.test_wrong_device_token_never_reaches_the_workspace"
+   ],
+   "integration": null
+  },
+  {
+   "id": "R34",
+   "title": "Phase 6: effects only by explicit grant, approval-bound, journaled at most once, honest NEEDS_RECONCILIATION",
+   "doc": [
+    "docs/OPERATOR_GUIDE.md",
+    "Runbook: `NEEDS_RECONCILIATION`"
+   ],
+   "code": [
+    [
+     "device_agent/core.py",
+     "def _effect"
+    ],
+    [
+     "coding_agent/journal.py",
+     "class OperationJournal"
+    ]
+   ],
+   "tests": [
+    "tests.test_experimental_mutation_stack.ApprovedMutation.test_nothing_changes_before_the_decision_and_approval_applies_once_with_a_receipt",
+    "tests.test_experimental_mutation_stack.ApprovedMutation.test_rejection_changes_nothing_and_records_no_effect",
+    "tests.test_experimental_mutation_stack.ApprovedMutation.test_wrong_fingerprint_and_a_second_decision_are_refused",
+    "tests.test_experimental_mutation_stack.ApprovedMutation.test_tests_never_report_a_false_pass",
+    "tests.test_experimental_mutation_stack.RestartsAroundApproval.test_service_killed_while_a_decision_is_pending_never_applies_it_afterwards",
+    "tests.test_experimental_mutation_stack.CrashPoints.test_crash_after_claim_before_the_effect",
+    "tests.test_experimental_mutation_stack.CrashPoints.test_crash_after_the_effect_before_it_was_recorded",
+    "tests.test_experimental_mutation_stack.CrashPoints.test_crash_after_recording_before_the_response"
+   ],
+   "integration": null
+  },
+  {
+   "id": "R35",
+   "title": "Phase 6: write guard against a human's concurrent save (Windows), cancel-after-commit keeps the receipt, git commit is its own grant",
+   "doc": [
+    "docs/OPERATOR_GUIDE.md",
+    "Known limits (stated, not hidden)"
+   ],
+   "code": [
+    [
+     "coding_agent/write_guard.py",
+     "def guard"
+    ],
+    [
+     "coding_agent/write_guard.py",
+     "def replace_file"
+    ]
+   ],
+   "tests": [
+    "tests.test_write_guard.RaceInjection.test_a_change_before_the_final_check_is_detected_and_nothing_is_overwritten",
+    "tests.test_write_guard.RaceInjection.test_a_save_in_the_window_between_check_and_replace_is_refused_not_lost",
+    "tests.test_write_guard.RaceInjection.test_concurrent_apply_attempts_never_interleave",
+    "tests.test_effect_semantics.CancellationAfterCommit.test_a_cancel_that_lands_after_the_effect_never_hides_the_receipt",
+    "tests.test_effect_semantics.GitCommitSeparation.test_committing_is_its_own_grant"
+   ],
+   "integration": null
+  },
+  {
+   "id": "R36",
+   "title": "Phase 7: in-process entrances quarantined; one-page host kit and operator guide; same conformance suite against real separate processes",
+   "doc": [
+    "docs/HOST_KIT.md",
+    "Not for production"
+   ],
+   "code": [
+    [
+     "code_attach/router.py",
+     "prototype"
+    ],
+    [
+     "code_attach/protocol_router.py",
+     "prototype"
+    ]
+   ],
+   "tests": [
+    "tests.test_code_attach_posture.Posture.test_in_process_entrances_refuse_to_mount_without_the_prototype_acknowledgement",
+    "tests.test_protocol_conformance.StackReadProposeConformance.test_hostile_paths_and_secrets_never_appear_in_any_event",
+    "tests.test_protocol_conformance.StackExperimentalConformance.test_experimental_mutation_yields_a_receipt_only_after_approval"
+   ],
+   "integration": null
+  }
+ ],
+ "deferred": [
+  {
+   "id": "D03",
+   "title": "Delete / rename files",
+   "doc": [
+    "docs/ATTACH_V0.md",
+    "no delete/rename"
+   ],
+   "code": [],
+   "tests": [],
+   "integration": null
+  },
+  {
+   "id": "D04",
+   "title": "Git operations (status/diff/commit)",
+   "doc": [
+    "docs/ATTACH_V0.md",
+    "no Git"
+   ],
+   "code": [],
+   "tests": [],
+   "integration": null
+  },
+  {
+   "id": "D05",
+   "title": "Regex / symbol-aware code search",
+   "doc": [
+    "docs/ATTACH_V0.md",
+    "No regex"
+   ],
+   "code": [],
+   "tests": [],
+   "integration": null
+  },
+  {
+   "id": "D06",
+   "title": "Frontend approval UI reference component",
+   "doc": [
+    "docs/ATTACH_V0.md",
+    "Frontend:"
+   ],
+   "code": [],
+   "tests": [],
+   "integration": null
+  },
+  {
+   "id": "D07",
+   "title": "Streaming events (SSE) instead of polling",
+   "doc": [],
+   "code": [],
+   "tests": [],
+   "integration": null
+  }
+ ]
+}
