@@ -1,5 +1,7 @@
 # Host AI handoff — minimal implementation instructions
 
+> **Historical, superseded. Not valid as a host implementation ticket.** [ADR-004](ADR-004_THIN_HOST_SDK_BOUNDARY.md) assigns HTTP, retries, events, deduplication and capabilities to the packaged AgentGateway SDK. The receiving host only connects existing identity, workspace ACL, attachment grants and chat display. No host handoff until the SDK and service are verified.
+
 **Read first:** [INTEGRATION_CONTRACT_V0_1.md](INTEGRATION_CONTRACT_V0_1.md) (normative, proposed). Also see [HOST_BACKEND_WRAPPER_REQUIREMENTS.md](HOST_BACKEND_WRAPPER_REQUIREMENTS.md). This checklist is deliberately short for an assistant with limited project context.
 
 ## Your job (host backend only)
