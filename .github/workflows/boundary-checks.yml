@@ -28,3 +28,4 @@ jobs:
           python -m unittest discover -s tests -p 'test_code_attach_boundaries.py' -v
           python -m unittest discover -s tests -p 'test_code_attach_abnormal.py' -v
           python -m unittest discover -s tests -p 'test_code_attach.py' -v
+          python -m unittest discover -s tests -p 'test_code_attach_project.py' -v

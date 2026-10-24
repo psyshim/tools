@@ -70,4 +70,6 @@ Frontend: poll events, render `assistant` text, and for `approval_required` show
 - Approved test commands execute project code with the host process's privileges.
 - No external-editor write coordination beyond hash check at apply time.
 - Symlink tests cannot run on Windows without privilege (pre-existing, 3 tests).
+- Discovery tools: `find_files` (glob) and `search_text` (case-insensitive substring; max 5 hits per file, 50 total, skips `.git`, `node_modules`, `.venv`, `__pycache__`, binaries, files over 1 MiB; reports `more_in_file`). No regex, no symbol/AST search.
+- Edits to CRLF files accept LF text and keep CRLF endings.
 - Plain-text unique replace and new-file creation only; no delete/rename, no Git.

@@ -1,6 +1,7 @@
 """Tools the model may call. Side effects (apply, run_tests) are gated by approval in session.py."""
 import difflib
 import hashlib
+import fnmatch
 import json
 import os
 import subprocess
@@ -11,11 +12,21 @@ from coding_agent.workflow import Workflow, Conflict
 from coding_agent.workspace import Workspace
 
 MAX_OUTPUT = 8000
+SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__", ".mypy_cache", ".pytest_cache", ".tox", "dist", "build", ".idea"}
+MAX_FILES_SCANNED = 20000
+MAX_MATCHES = 50
+MAX_PER_FILE = 5
+CR, LF = chr(13), chr(10)
+CRLF = CR + LF
 EFFECT_TOOLS = {"apply_proposal", "run_tests"}
 
 SCHEMAS = [
     {"name": "list_dir", "description": "List files under a workspace-relative directory.",
      "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "depth": {"type": "integer"}}}},
+    {"name": "find_files", "description": "Find files by glob (e.g. '*.ini', 'settings*', 'src/**/*.py') anywhere under a directory, skipping build/vendor/VCS folders.",
+     "parameters": {"type": "object", "properties": {"pattern": {"type": "string"}, "path": {"type": "string"}}, "required": ["pattern"]}},
+    {"name": "search_text", "description": "Case-insensitive substring search across text files under a directory. Use it to locate code, config or docs whose location is unknown.",
+     "parameters": {"type": "object", "properties": {"query": {"type": "string"}, "path": {"type": "string"}, "glob": {"type": "string"}}, "required": ["query"]}},
     {"name": "read_file", "description": "Read lines of a text file (max 200 lines per call).",
      "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "start_line": {"type": "integer"}, "end_line": {"type": "integer"}}, "required": ["path"]}},
     {"name": "propose_edit", "description": "Propose replacing one exact, unique text occurrence in a file. Nothing is written until apply_proposal is approved.",
@@ -73,6 +84,66 @@ class ToolBox:
     def t_read_file(self, path, start_line=1, end_line=200):
         return self.ws.read_file(path, start_line, min(end_line, start_line + 199))
 
+    def _files(self, path):
+        base = self.ws._resolve(path)
+        if not base.is_dir():
+            raise ValueError("not a directory")
+        scanned = 0
+        for dirpath, dirs, files in os.walk(base, followlinks=False):
+            dirs[:] = sorted(d for d in dirs if d not in SKIP_DIRS and not (Path(dirpath) / d).is_symlink())
+            for name in sorted(files):
+                scanned += 1
+                if scanned > MAX_FILES_SCANNED:
+                    return
+                full = Path(dirpath) / name
+                if full.is_symlink():
+                    continue
+                try:
+                    self.ws._resolve(full.relative_to(self.ws.root))
+                except ValueError:
+                    continue
+                yield full
+
+    def t_find_files(self, pattern, path="."):
+        hits, truncated = [], False
+        for f in self._files(path):
+            rel = f.relative_to(self.ws.root).as_posix()
+            if fnmatch.fnmatch(rel, pattern) or fnmatch.fnmatch(f.name, pattern):
+                if len(hits) >= 100:
+                    truncated = True
+                    break
+                hits.append(rel)
+        return {"files": hits, "truncated": truncated}
+
+    def t_search_text(self, query, path=".", glob=None):
+        if not isinstance(query, str) or not query or len(query) > 200:
+            raise ValueError("invalid query")
+        needle, matches, truncated, extra = query.lower(), [], False, {}
+        for f in self._files(path):
+            rel = f.relative_to(self.ws.root).as_posix()
+            if glob and not (fnmatch.fnmatch(rel, glob) or fnmatch.fnmatch(f.name, glob)):
+                continue
+            try:
+                if f.stat().st_size > 1048576:
+                    continue
+                data = f.read_bytes()
+            except OSError:
+                continue
+            if bytes([0]) in data[:4096]:
+                continue
+            in_file = 0
+            for n, line in enumerate(data.decode("utf-8", "replace").splitlines(), 1):
+                if needle not in line.lower():
+                    continue
+                in_file += 1
+                if in_file > MAX_PER_FILE:  # a noisy file must not crowd out other files
+                    extra[rel] = extra.get(rel, 0) + 1
+                elif len(matches) >= MAX_MATCHES:
+                    return {"matches": matches, "truncated": True, "more_in_file": extra}
+                else:
+                    matches.append({"path": rel, "line": n, "text": line.strip()[:200]})
+        return {"matches": matches, "truncated": truncated, "more_in_file": extra}
+
     # --- proposals (no writes) ---
     def _store(self, path, kind, old, new, before, after, sha):
         diff = "".join(difflib.unified_diff(before.splitlines(True), after.splitlines(True), f"a/{path}", f"b/{path}"))[:MAX_OUTPUT]
@@ -84,7 +155,9 @@ class ToolBox:
 
     def t_propose_edit(self, path, old, new):
         info = self.flow.inspect(path)
-        text = self.ws._resolve(path).read_text(encoding="utf-8")
+        text = self.ws._resolve(path).read_bytes().decode("utf-8")
+        if CRLF in text and CR not in old:  # CRLF file: the model writes LF
+            old, new = old.replace(LF, CRLF), new.replace(LF, CRLF)
         if not old or text.count(old) != 1:
             raise ValueError("old text must occur exactly once")
         return self._store(path, "edit", old, new, text, text.replace(old, new, 1), info["sha256"])
