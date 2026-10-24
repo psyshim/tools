@@ -67,7 +67,7 @@ def handler_factory(token, control_token, store=None):
                 return self.send(400, {"error":"idempotency_key_required"})
             try:
                 obj = self.body()
-                if obj.get("protocol") != "1.0" or obj.get("mode") != "read" or not obj.get("workspace_id") or not obj.get("instruction"):
+                if obj.get("protocol") != "1.0" or obj.get("mode") != "read" or not isinstance(obj.get("workspace_id"), str) or not obj["workspace_id"].strip() or not isinstance(obj.get("instruction"), str) or not obj["instruction"].strip():
                     raise ValueError("unsupported request")
                 digest = hashlib.sha256(json.dumps(obj, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
             except (TypeError, ValueError):
@@ -87,7 +87,7 @@ def handler_factory(token, control_token, store=None):
                         {"id":"2", "task_id":task_id, "type":"task.failed" if outcome == "FAILED" else "task.completed", "payload":{"status":outcome}}
                     ]}
                 scenario = state.scenario
-            if scenario == "drop_after_create":
+            if scenario == "drop_after_create" and state.calls == 1:
                 self.close_connection = True
                 return
             return self.send(202, {"task_id":task_id, "state":"QUEUED", "event_cursor":"0"})
