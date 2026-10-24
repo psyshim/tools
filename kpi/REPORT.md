@@ -6,11 +6,11 @@ Evidence tests executed: 37; passing: 37.
 
 | KPI | Numerator | Denominator | Rate |
 | --- | --- | --- | --- |
-| v0 progress (level points) | 61 | 65 = sum of each v0 item's max level (21 items; max 3, or 4 where an integration evidence path is defined) | **93.8%** |
-| Full scope (v0 + deferred) | 67 | 86 | 77.9% |
-| v0 items reaching SPECIFIED | 21 | 21 items | 100.0% |
-| v0 items reaching IMPLEMENTED | 20 | 21 items | 95.2% |
-| v0 items reaching TESTED | 20 | 21 items | 95.2% |
+| v0 progress (level points) | 64 | 68 = sum of each v0 item's max level (22 items; max 3, or 4 where an integration evidence path is defined) | **94.1%** |
+| Full scope (v0 + deferred) | 70 | 89 | 78.7% |
+| v0 items reaching SPECIFIED | 22 | 22 items | 100.0% |
+| v0 items reaching IMPLEMENTED | 21 | 22 items | 95.5% |
+| v0 items reaching TESTED | 21 | 22 items | 95.5% |
 | v0 items reaching INTEGRATED | 0 | 2 items | 0.0% |
 
 **Read the headline together with the INTEGRATED row**: TESTED means scripted mock models and a virtual project pass. It is not evidence that a real model or the real chat app works.
@@ -48,6 +48,7 @@ Denominator per model = 6 scenarios x 3 trials = **18** runs.
 | R19 | Layering: host layer has no execution; agent layer has no HTTP/network | TESTED | TESTED | - |
 | R20 | Wired into the real chat app (FastAPI + React) and used end to end | SPECIFIED | INTEGRATED | code symbol |
 | R21 | Real model completes the scenarios (see real-model KPI) | TESTED | INTEGRATED | integration evidence |
+| R22 | One-page host handoff (adapter-only wiring recipe) | TESTED | TESTED | - |
 | D01 | Durable journal / crash recovery of tasks | SPECIFIED | TESTED | code symbol |
 | D02 | Service/device split with signed claims (ADR-004) | SPECIFIED | TESTED | code symbol |
 | D03 | Delete / rename files | SPECIFIED | TESTED | code symbol |
