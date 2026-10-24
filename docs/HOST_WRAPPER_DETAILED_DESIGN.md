@@ -1,5 +1,7 @@
 # Host Backend Wrapper — Detailed Implementation Design
 
+> **Historical threat model, NOT the current receiving-team implementation specification.** [ADR-004](ADR-004_THIN_HOST_SDK_BOUNDARY.md) supersedes the host work allocation below. HTTP client, retries, event dedupe/recovery, capability probing and protocol errors belong to our distributed SDK, not host glue. The receiving team only binds existing authentication, workspace authorization, image grants and chat presentation. No handoff until SDK/service contract tests pass.
+
 **Document ID:** HWR-001  
 **Status:** specification for implementation, NOT implemented.  
 **Normative dependency:** [INTEGRATION_CONTRACT_V0_1.md](INTEGRATION_CONTRACT_V0_1.md). If the two disagree, its normative protocol contract takes precedence.  
