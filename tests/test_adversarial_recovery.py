@@ -39,6 +39,17 @@ class AdversarialRecoveryTests(unittest.TestCase):
         self.assertEqual(first["task_id"], self.call("/v1/tasks", task)[1]["task_id"])
         self.assertEqual(len(self.store.tasks), 1)
 
+    def test_response_loss_is_per_operation_not_global(self):
+        self.assertEqual(self.call("/__test/scenario", {"scenario":"drop_after_create"}, token="control-token")[0], 200)
+        for key in ("operation-a", "operation-b"):
+            request={"protocol":"1.0", "mode":"read", "workspace_id":"w", "instruction":key}
+            with self.assertRaises((urllib.error.URLError, ConnectionError)):
+                self.call("/v1/tasks", request, key=key)
+            status, saved = self.call("/v1/tasks", request, key=key)
+            self.assertEqual(status, 202)
+            self.assertEqual(self.call("/v1/tasks", request, key=key)[1]["task_id"], saved["task_id"])
+        self.assertEqual(len(self.store.tasks), 2)
+
     def test_invalid_field_types_rejected(self):
         for field in ("workspace_id", "instruction"):
             for invalid in (["x"], {"x":1}, 42, ""):
