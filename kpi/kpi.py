@@ -111,6 +111,7 @@ def report(scope, rows, status, target, models, n_scen):
         applicable = [r for r in v0 if r["max"] >= k]
         reached = sum(r["idx"] >= k for r in applicable)
         L.append(f"| v0 items reaching {lv} | {reached} | {len(applicable)} items | {pct(reached, len(applicable))} |")
+    L.append("\n**Read the headline together with the INTEGRATED row**: TESTED means scripted mock models and a virtual project pass. It is not evidence that a real model or the real chat app works.")
     L.append("\nLevel points: NONE 0, SPECIFIED 1, IMPLEMENTED 2, TESTED 3, INTEGRATED 4. A level counts only if every lower level holds. TESTED = all listed tests pass in this run. INTEGRATED = non-empty evidence file from a real host/model run.\n")
     L.append("## 2. Real-model KPI (separate; scripted mocks never count)\n")
     L.append(f"Denominator per model = {n_scen} scenarios x {scope['target_trials_per_scenario']} trials = **{target}** runs.\n")

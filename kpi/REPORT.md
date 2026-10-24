@@ -13,6 +13,8 @@ Evidence tests executed: 37; passing: 37.
 | v0 items reaching TESTED | 20 | 21 items | 95.2% |
 | v0 items reaching INTEGRATED | 0 | 2 items | 0.0% |
 
+**Read the headline together with the INTEGRATED row**: TESTED means scripted mock models and a virtual project pass. It is not evidence that a real model or the real chat app works.
+
 Level points: NONE 0, SPECIFIED 1, IMPLEMENTED 2, TESTED 3, INTEGRATED 4. A level counts only if every lower level holds. TESTED = all listed tests pass in this run. INTEGRATED = non-empty evidence file from a real host/model run.
 
 ## 2. Real-model KPI (separate; scripted mocks never count)
