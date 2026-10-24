@@ -20,8 +20,14 @@ def to_openai(messages, tools):
     return {"messages": out, "tools": [{"type": "function", "function": t} for t in tools]}
 
 def from_openai(response_message):
-    calls = [{"id": c["id"], "name": c["function"]["name"], "args": _loads(c["function"]["arguments"])} for c in response_message.get("tool_calls") or []]
-    return {"text": response_message.get("content") or "", "tool_calls": calls}
+    """Tolerant: a malformed tool call becomes a call with empty name/args (Task answers it with an error) instead of raising."""
+    calls = []
+    for c in response_message.get("tool_calls") or []:
+        c = c if isinstance(c, dict) else {}
+        fn = c.get("function") if isinstance(c.get("function"), dict) else {}
+        calls.append({"id": c.get("id"), "name": fn.get("name"), "args": _loads(fn.get("arguments"))})
+    content = response_message.get("content")
+    return {"text": content if isinstance(content, str) else "", "tool_calls": calls}
 
 def to_anthropic(messages, tools):
     system = "\n".join(m["text"] for m in messages if m["role"] == "system")
@@ -43,8 +49,10 @@ def to_anthropic(messages, tools):
     return {"system": system, "messages": out, "tools": [{"name": t["name"], "description": t["description"], "input_schema": t["parameters"]} for t in tools]}
 
 def from_anthropic(content_blocks):
-    text = "".join(b.get("text", "") for b in content_blocks if b.get("type") == "text")
-    calls = [{"id": b["id"], "name": b["name"], "args": b.get("input", {})} for b in content_blocks if b.get("type") == "tool_use"]
+    blocks = [b for b in content_blocks or [] if isinstance(b, dict)]
+    text = "".join(b.get("text", "") for b in blocks if b.get("type") == "text" and isinstance(b.get("text", ""), str))
+    calls = [{"id": b.get("id"), "name": b.get("name"), "args": b.get("input") if isinstance(b.get("input"), dict) else {}}
+             for b in blocks if b.get("type") == "tool_use"]
     return {"text": text, "tool_calls": calls}
 
 def _loads(s):

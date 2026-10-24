@@ -19,14 +19,23 @@ class PatchingTests(unittest.TestCase):
                 editor.replace("x.txt", old_hash, "overwrite")
             self.assertEqual(file.read_text(), "new")
 
-    def test_reject_escape_and_symlink(self):
+    def test_reject_escape(self):
+        with tempfile.TemporaryDirectory() as d:
+            with self.assertRaises(ValueError):
+                SafeEditor(Workspace(d)).replace("../secret.txt", "", "wrong")
+
+    def test_reject_symlink(self):
         with tempfile.TemporaryDirectory() as d, tempfile.TemporaryDirectory() as outside:
             secret = Path(outside) / "secret.txt"
             secret.write_text("secret")
-            (Path(d) / "link.txt").symlink_to(secret)
+            try:
+                (Path(d) / "link.txt").symlink_to(secret)
+            except OSError as exc:
+                if getattr(exc, "winerror", None) == 1314:
+                    self.skipTest("Windows symlink privilege unavailable")
+                raise
             editor = SafeEditor(Workspace(d))
             digest = hashlib.sha256(b"secret").hexdigest()
-            for p in ("../secret.txt", "link.txt"):
-                with self.assertRaises(ValueError):
-                    editor.replace(p, digest, "wrong")
+            with self.assertRaises(ValueError):
+                editor.replace("link.txt", digest, "wrong")
             self.assertEqual(secret.read_text(), "secret")

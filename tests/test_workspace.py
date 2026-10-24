@@ -27,7 +27,12 @@ class AgentTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory, tempfile.TemporaryDirectory() as external:
             outside = Path(external) / "secret"
             outside.write_text("secret")
-            (Path(directory) / "link").symlink_to(outside)
+            try:
+                (Path(directory) / "link").symlink_to(outside)
+            except OSError as exc:
+                if getattr(exc, "winerror", None) == 1314:
+                    self.skipTest("Windows symlink privilege unavailable")
+                raise
             ws = Workspace(directory)
             self.assertEqual(ws.list_directory(), [])
             with self.assertRaises(ValueError):

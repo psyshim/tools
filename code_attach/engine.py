@@ -1,7 +1,7 @@
 """Agent-side facade. Owns task registry, idempotency and ownership. Knows nothing about HTTP or the host's auth."""
 import hashlib
 import threading
-from .session import Task, TERMINAL
+from .session import LogUnavailable, Task, TERMINAL
 from .tools import ToolBox
 
 def _ref(value):
@@ -21,12 +21,15 @@ class BadWorkspace(Exception):
     pass
 
 class Engine:
-    def __init__(self, complete, test_commands=None, max_tasks=64, test_timeout=180, event_sink=None, test_env=None, keep_finished=256):
+    """Task registry for one host: start/observe/decide/cancel with per-principal ownership, idempotency keys,
+    a cap on ACTIVE tasks and bounded retention of finished ones. Knows nothing about HTTP or authentication."""
+    def __init__(self, complete, test_commands=None, max_tasks=64, test_timeout=180, event_sink=None, test_env=None, keep_finished=256, recycle_dir=None):
         self._complete = complete
         self._tests = dict(test_commands or {})
         self._max = max_tasks
         self._timeout = test_timeout
         self._test_env = test_env
+        self._recycle_dir = recycle_dir
         self._keep = keep_finished
         self._event_sink = event_sink
         self._tasks, self._keys, self._content = {}, {}, {}
@@ -49,12 +52,19 @@ class Engine:
             if sum(t.state not in TERMINAL for t in self._tasks.values()) >= self._max:
                 raise Busy()
             try:
-                toolbox = ToolBox(root, self._tests, self._timeout, self._test_env)
+                toolbox = ToolBox(root, self._tests, self._timeout, self._test_env, recycle_dir=self._recycle_dir)
             except (OSError, ValueError):
                 raise BadWorkspace()
             task = Task(principal, toolbox, self._complete, instruction, event_sink=self._event_sink)
-            task.emit("task_started", {"instruction": instruction, "workspace_ref": _ref(root), "principal_ref": _ref(principal)}, private=True)
             self._tasks[task.id], self._keys[key], self._content[task.id] = task, task.id, content
+        try:  # sink I/O happens outside the registry lock
+            task.emit("task_started", {"instruction": instruction, "workspace_ref": _ref(root), "principal_ref": _ref(principal)}, private=True)
+        except LogUnavailable:
+            with self._lock:
+                self._tasks.pop(task.id, None)
+                self._content.pop(task.id, None)
+                self._keys.pop(key, None)
+            raise
         task.start()
         return task.id, task.state
 

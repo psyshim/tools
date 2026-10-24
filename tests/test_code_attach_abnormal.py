@@ -164,9 +164,10 @@ class ModelAbnormal(Case):
         self.assertEqual(h.done()["state"], "COMPLETED")
         self.assertTrue(all(r["result"]["status"] == "ERROR" for r in h.results()))
 
-    def test_tool_call_without_id_fails_task(self):
-        h = self.make(model({"text": "", "tool_calls": [{"name": "list_dir", "args": {}}]}))
-        self.assertEqual(h.done()["state"], "FAILED")
+    def test_tool_call_without_id_gets_an_id_and_runs(self):
+        h = self.make(model({"text": "", "tool_calls": [{"name": "list_dir", "args": {}}]}, {"text": "ok", "tool_calls": []}))
+        self.assertEqual(h.done()["state"], "COMPLETED")
+        self.assertIn("entries", h.results("list_dir")[0]["result"])
 
     def test_model_exception_is_failed_not_completed(self):
         h = self.make(model())

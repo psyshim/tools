@@ -11,6 +11,7 @@ import time
 import urllib.request
 from code_attach.engine import Engine
 from code_attach.providers import from_openai, to_openai
+from coding_agent.activity_log import ActivityLog, default_log_dir
 
 def complete(messages, tools):
     payload = {"model": os.environ["MODEL"], **to_openai(messages, tools)}
@@ -20,7 +21,9 @@ def complete(messages, tools):
         return from_openai(json.load(r)["choices"][0]["message"])
 
 def main(project, instruction, test_argv):
-    engine = Engine(complete, {"tests": test_argv} if test_argv else None)
+    activity = ActivityLog(default_log_dir(project))
+    print("Task logs:", activity.directory)
+    engine = Engine(complete, {"tests": test_argv} if test_argv else None, event_sink=activity.record)
     tid, _ = engine.start("local", project, "run-1", instruction)
     seen = 0
     while True:

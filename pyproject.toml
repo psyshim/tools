@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "code-attach"
+version = "0.1.0"
+description = "Attachable local coding agent with per-action approval"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = ["fastapi>=0.115,<1"]
+
+[project.optional-dependencies]
+local = ["uvicorn>=0.30,<1"]
+test = ["httpx>=0.27,<1"]
+
+[project.scripts]
+code-attach = "examples.local_app:main"
+
+[tool.setuptools.packages.find]
+include = ["code_attach*", "coding_agent*", "examples*"]
+
+[tool.setuptools.package-data]
+examples = ["local_ui/*.html", "local_ui/*.css", "local_ui/*.js"]

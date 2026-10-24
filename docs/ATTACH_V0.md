@@ -1,12 +1,12 @@
 # code_attach v0 — host wiring (1-day delivery)
 
-**Status:** IMPLEMENTED and TESTED locally with scripted mock models (`tests/test_code_attach*.py`: normal, abnormal, boundary; no real LLM or real chat app yet). **INTEGRATED: no.**
+**Status:** IMPLEMENTED with a runnable local browser host (`python -m examples.local_app`) and scripted-model integration tests. External chat-product integration and real-model execution remain unverified. See the root README for startup instructions.
 
 ## Deviation from ADR-004 (decided 2026-10-24, owner-approved)
 
 To deliver edit + test in one day, v0 runs **in the host's FastAPI process on the same PC as the projects**. The service/device split, durable journal, signed claims and separate SDK package are deferred. Consequences:
 
-- No crash recovery: tasks, proposals and events live in memory and are lost on restart.
+- No crash recovery: live tasks and proposals are lost on restart. Local host/CLI activity logs persist independently; they do not resume execution.
 - Task ownership is by host-supplied principal only; no device-side policy independent of the host.
 - Apply and test run are protected by per-action user approval bound to a fingerprint (diff / argv), not by a separate device authority.
 - Do not expose the router beyond the host's authenticated users.
@@ -46,6 +46,12 @@ app.include_router(make_router(complete, authorize, resolve_workspace,
 
 `test_commands` maps a name to a fixed argv. The model chooses only the name. Omit it to disable testing.
 
+## Persistent activity logging (priority: medium)
+
+The runnable local host and CLI enable durable, per-user JSONL activity logs by default, outside the workspace. Instructions, assistant output, tool results, approval requests and decisions, cancellation and final states are recorded with task IDs and UTC timestamps; every append is flushed and fsynced. Restarting leaves these files intact. The local app displays the exact directory and accepts `--log-dir` before `--test-command`.
+
+An embedding host supplies `event_sink=ActivityLog(directory).record` to `make_router`, importing `ActivityLog` from `coding_agent.activity_log` in its own wiring code. The router itself performs no filesystem access. A logging failure before start/approval returns 503 without executing that action; worker logging failures produce FAILED. Logs may include user-supplied source/diffs and are not redacted source archives. Credentials/HTTP headers are not part of the event schema. Retention is local and unlimited until the owner removes files.
+
 ## HTTP surface (under the chosen prefix)
 
 | Call | Purpose |
@@ -69,7 +75,12 @@ Frontend: poll events, render `assistant` text, and for `approval_required` show
 
 - Approved test commands execute project code with the host process's privileges.
 - No external-editor write coordination beyond hash check at apply time.
-- Symlink tests cannot run on Windows without privilege (pre-existing, 3 tests).
-- Discovery tools: `find_files` (glob) and `search_text` (case-insensitive substring; max 5 hits per file, 50 total, skips `.git`, `node_modules`, `.venv`, `__pycache__`, binaries, files over 1 MiB; reports `more_in_file`). No regex, no symbol/AST search.
+- Three symlink tests are explicitly skipped on Windows when symlink privilege is unavailable; path-escape rejection is still tested.
+- The in-memory registry retains at most 64 tasks, including finished tasks. Restart the local host to reset it.
+- Discovery tools: `find_files` (glob) and `search_text` (case-insensitive substring; max 5 hits per file, 50 total, skips `.git`, `node_modules`, `.venv`, `__pycache__`, binaries, files over 8 MiB; reports `more_in_file` and `skipped_large_files`). `start_line` continues a search beyond early matches. No regex, no symbol/AST search.
+- Attachment read/edit supports UTF-8 files up to 8 MiB. Reads return at most 200 lines and reject pages over 32,000 characters. `start_line` alone selects the next page correctly. Each replacement is at most 20,000 characters per old/new string after CRLF normalization; complete approval diffs are at most 64,000 characters. Oversize edits/diffs are rejected at proposal time rather than after approval. The older read-only service remains at its default 1 MiB.
+- `python -m examples.stress_check --output stress-report.json` runs an offline large-script acceptance matrix with fresh dummy projects, real regression commands and byte-level collateral checks. It does not use or grade a real LLM. It includes a complete Engine/approval flow on a 100,000-line script and separately approved helper-module extraction from a 10,000-line script. Multi-file edits are not transactional; the 20-turn limit still applies.
 - Edits to CRLF files accept LF text and keep CRLF endings.
-- Plain-text unique replace and new-file creation only; no delete/rename, no Git.
+- Effects also include proposed file copy/move, recoverable deletion/restoration, directory creation and empty-directory removal. No destination overwrite or recursive tree deletion. Recovery storage is per-workspace and outside the workspace; see [ADVERSARIAL_ACCEPTANCE.md](ADVERSARIAL_ACCEPTANCE.md).
+- Local Git status/diff/staged diff/log/branches and selected-file commit proposals are supported. Commits require an existing branch/history and no pre-existing staged changes, and pin HEAD/branch/index/source snapshots. Hooks, external filters and signing are disabled. Merge/rebase/cherry-pick/reset/clean/network operations are not exposed.
+- UTF BOMs are detected; optional `encoding` supports explicit CP932/Shift-JIS and endian-specific Unicode. Strict round-trip and representability checks preserve original bytes or refuse the edit. Search reports encoding skips. A byte-preserving selected encoding does not prove a correct semantic interpretation of ambiguous text.

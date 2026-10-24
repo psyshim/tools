@@ -84,8 +84,8 @@
    "id": "R05",
    "title": "New-file proposal and creation",
    "doc": [
-    "docs/ATTACH_V0.md",
-    "new-file creation"
+    "docs/HOST_HANDOFF.md",
+    "propose_new_file"
    ],
    "code": [
     [
@@ -201,7 +201,7 @@
    ],
    "code": [
     [
-     "code_attach/tools.py",
+     "code_attach/testrun.py",
      "TIMEOUT"
     ]
    ],
@@ -306,7 +306,7 @@
     "tests.test_code_attach_abnormal.ModelAbnormal.test_endless_tool_loop_hits_step_limit",
     "tests.test_code_attach_abnormal.ModelAbnormal.test_malformed_arguments_are_errors",
     "tests.test_code_attach_abnormal.ModelAbnormal.test_unknown_tool_is_error_and_loop_continues",
-    "tests.test_code_attach_abnormal.ModelAbnormal.test_tool_call_without_id_fails_task"
+    "tests.test_code_attach_abnormal.ModelAbnormal.test_tool_call_without_id_gets_an_id_and_runs"
    ],
    "integration": null
   },
@@ -452,7 +452,7 @@
    ],
    "code": [
     [
-     "code_attach/tools.py",
+     "code_attach/testrun.py",
      "SAFE_ENV"
     ],
     [
@@ -468,6 +468,115 @@
     "tests.test_code_attach_audit.ScrubForms.test_repr_escaped_lowercase_and_posix_spellings_are_scrubbed",
     "tests.test_code_attach_audit.GlobSemantics.test_double_star_matches_zero_or_more_directories",
     "tests.test_code_attach_audit.TaskCapacity.test_missing_workspace_is_a_typed_error"
+   ],
+   "integration": null
+  },
+  {
+   "id": "R25",
+   "title": "Audit batch 2: tolerant of sloppy models, cancel kills tests, non-blocking log writes, bounded model context, no personal log path",
+   "doc": [
+    "docs/AUDIT_2026-10-24.md",
+    "approval_expired"
+   ],
+   "code": [
+    [
+     "code_attach/session.py",
+     "class LogUnavailable"
+    ],
+    [
+     "code_attach/activity.py",
+     "display_path"
+    ]
+   ],
+   "tests": [
+    "tests.test_code_attach_audit2.SloppyModel.test_call_without_id_is_executed_and_completes",
+    "tests.test_code_attach_audit2.SloppyModel.test_garbage_tool_calls_become_errors_not_crashes",
+    "tests.test_code_attach_audit2.Cancellation.test_cancel_kills_a_running_test_promptly",
+    "tests.test_code_attach_audit2.LockingAndLogging.test_polling_is_not_blocked_by_a_slow_log_write",
+    "tests.test_code_attach_audit2.LockingAndLogging.test_concurrent_decisions_and_events_do_not_deadlock",
+    "tests.test_code_attach_audit2.LockingAndLogging.test_only_log_failures_map_to_503",
+    "tests.test_code_attach_audit2.BoundedContext.test_old_tool_results_are_shortened_for_the_model_only",
+    "tests.test_code_attach_audit2.ApprovalAndRetry.test_unanswered_approval_expires_visibly",
+    "tests.test_code_attach_audit2.ApprovalAndRetry.test_transient_os_error_does_not_burn_the_proposal",
+    "tests.test_code_attach_audit2.SearchAndScan.test_start_line_pages_one_file_and_applies_to_every_file_in_a_directory",
+    "tests.test_code_attach_audit2.SearchAndScan.test_scan_limit_is_reported_not_silent",
+    "tests.test_code_attach_audit2.PathDisplay.test_display_path_never_contains_the_user_name_or_drive"
+   ],
+   "integration": null
+  },
+  {
+   "id": "R26",
+   "title": "Maintainability: single-responsibility modules, registry guard rails, lint, maintainer guide",
+   "doc": [
+    "docs/MAINTAINING_CODE_ATTACH.md",
+    "Adding a tool (checklist)"
+   ],
+   "code": [
+    [
+     "code_attach/testrun.py",
+     "class CommandRunner"
+    ],
+    [
+     "code_attach/privacy.py",
+     "class Scrubber"
+    ],
+    [
+     "code_attach/schemas.py",
+     "EFFECT_TOOLS"
+    ]
+   ],
+   "tests": [
+    "tests.test_code_attach_registry.RegistryTests.test_schemas_and_methods_pair_up_exactly",
+    "tests.test_code_attach_registry.RegistryTests.test_each_schema_is_well_formed_and_matches_its_signature",
+    "tests.test_code_attach_registry.RegistryTests.test_effect_tools_are_exactly_those_that_say_they_need_approval",
+    "tests.test_code_attach_registry.RegistryTests.test_every_effect_tool_can_describe_itself_for_the_approval_card",
+    "tests.test_code_attach_registry.RegistryTests.test_proposing_tools_never_write",
+    "tests.test_code_attach_registry.HygieneTests.test_no_unused_imports_or_names_in_code_attach",
+    "tests.test_code_attach_registry.HygieneTests.test_only_testrun_starts_processes",
+    "tests.test_code_attach_boundaries.BoundaryTests.test_every_module_is_classified"
+   ],
+   "integration": null
+  },
+  {
+   "id": "R27",
+   "title": "Adversarial robustness: hostile paths/args/models/races/HTTP/process output (22 attack tests)",
+   "doc": [
+    "docs/AUDIT_2026-10-24.md",
+    "Adversarial round"
+   ],
+   "code": [
+    [
+     "code_attach/session.py",
+     "MAX_CALLS_PER_TURN"
+    ],
+    [
+     "code_attach/router.py",
+     "async def read_model"
+    ]
+   ],
+   "tests": [
+    "tests.test_code_attach_adversarial.PathAttackMatrix.test_read_and_search_surfaces_never_leak_or_escape",
+    "tests.test_code_attach_adversarial.PathAttackMatrix.test_proposal_surfaces_never_write_or_escape",
+    "tests.test_code_attach_adversarial.PathAttackMatrix.test_applying_every_accepted_hostile_proposal_still_stays_inside",
+    "tests.test_code_attach_adversarial.ArgumentFuzz.test_garbage_arguments_only_raise_handled_exceptions",
+    "tests.test_code_attach_adversarial.ArgumentFuzz.test_garbage_ids_and_names_for_effect_tools",
+    "tests.test_code_attach_adversarial.ArgumentFuzz.test_call_rejects_non_dict_arguments_and_private_names",
+    "tests.test_code_attach_adversarial.HostileModel.test_prompt_injection_in_a_file_cannot_trigger_effects",
+    "tests.test_code_attach_adversarial.HostileModel.test_too_many_tool_calls_in_one_reply_are_capped",
+    "tests.test_code_attach_adversarial.HostileModel.test_enormous_assistant_text_is_bounded_in_events",
+    "tests.test_code_attach_adversarial.HostileModel.test_huge_or_deeply_nested_arguments_do_not_break_the_host_conversion",
+    "tests.test_code_attach_adversarial.HostileModel.test_unknown_tool_names_never_create_approval_cards",
+    "tests.test_code_attach_adversarial.Races.test_double_apply_applies_exactly_once",
+    "tests.test_code_attach_adversarial.Races.test_two_proposals_on_the_same_base_one_wins_one_conflicts_no_corruption",
+    "tests.test_code_attach_adversarial.Races.test_simultaneous_decisions_exactly_one_wins",
+    "tests.test_code_attach_adversarial.Races.test_cancel_racing_completion_always_ends_consistently_and_without_thread_errors",
+    "tests.test_code_attach_adversarial.Races.test_many_parallel_tasks_with_small_capacity_never_deadlock",
+    "tests.test_code_attach_adversarial.HostileHttp.test_malformed_requests_never_produce_a_500",
+    "tests.test_code_attach_adversarial.HostileHttp.test_unauthenticated_and_foreign_access_is_refused_on_every_route",
+    "tests.test_code_attach_adversarial.HostileHttp.test_lone_surrogates_and_control_characters_in_input_do_not_break_logging",
+    "tests.test_code_attach_adversarial.ProvidersAndScrubber.test_malformed_model_responses_are_tolerated",
+    "tests.test_code_attach_adversarial.ProvidersAndScrubber.test_scrubber_is_fast_on_large_hostile_input_and_handles_odd_paths",
+    "tests.test_code_attach_adversarial.ProcessAbuse.test_hostile_test_output_and_behaviour_are_contained"
    ],
    "integration": null
   }

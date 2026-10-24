@@ -6,6 +6,7 @@ from pathlib import Path
 import tempfile
 import threading
 import uuid
+from .text_encoding import decode_source, encode_source
 
 _LOCK = threading.RLock()
 
@@ -13,7 +14,10 @@ class Conflict(Exception):
     pass
 
 class Workflow:
-    def __init__(self, workspace):
+    def __init__(self, workspace, max_file_bytes=1048576):
+        if type(max_file_bytes) is not int or not 1 <= max_file_bytes <= 8 * 1024 * 1024:
+            raise ValueError("invalid file size limit")
+        self.max_file_bytes = max_file_bytes
         self.root = Path(workspace).resolve(strict=True)
         if not self.root.is_dir():
             raise ValueError("workspace must be a directory")
@@ -32,11 +36,11 @@ class Workflow:
     def inspect(self, relative):
         target = self._file(relative)
         data = target.read_bytes()
-        if len(data) > 1048576:
+        if len(data) > self.max_file_bytes:
             raise ValueError("file too large")
         return {"path": relative, "sha256": hashlib.sha256(data).hexdigest(), "size": len(data)}
 
-    def replace_text(self, relative, expected_sha256, original, replacement):
+    def replace_text(self, relative, expected_sha256, original, replacement, encoding=None):
         if not all(isinstance(x, str) for x in (expected_sha256, original, replacement)):
             raise ValueError("invalid arguments")
         if not original or len(original) > 20000 or len(replacement) > 20000:
@@ -44,15 +48,15 @@ class Workflow:
         with _LOCK:
             path = self._file(relative)
             data = path.read_bytes()
-            if len(data) > 1048576:
+            if len(data) > self.max_file_bytes:
                 raise ValueError("file too large")
             if hashlib.sha256(data).hexdigest() != expected_sha256:
                 raise Conflict("stale SHA-256")
-            content = data.decode("utf-8")
+            content, codec, prefix = decode_source(data, encoding)
             if content.count(original) != 1:
                 raise Conflict("expected exactly one occurrence")
-            updated = content.replace(original, replacement, 1).encode("utf-8")
-            if len(updated) > 1048576:
+            updated = encode_source(content.replace(original, replacement, 1), codec, prefix)
+            if len(updated) > self.max_file_bytes:
                 raise ValueError("updated file too large")
             mode = path.stat().st_mode
             fd, tmp = tempfile.mkstemp(prefix=".agent-", dir=str(path.parent))
@@ -75,7 +79,7 @@ class Workflow:
     def test_python_syntax(self, relative):
         target = self._file(relative)
         source = target.read_bytes()
-        if len(source) > 1048576 or target.suffix != ".py":
+        if len(source) > self.max_file_bytes or target.suffix != ".py":
             raise ValueError("only small Python files supported")
         try:
             ast.parse(source, filename=relative)

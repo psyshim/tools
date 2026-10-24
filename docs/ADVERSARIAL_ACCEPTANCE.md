@@ -1,0 +1,38 @@
+# Adversarial acceptance gates
+
+The target is dependable everyday development work. A successful demonstration is insufficient: wrong inputs, concurrent changes, failures and unsupported operations must produce the right observable outcome. These gates measure the tool/runtime foundation, not a real model's reasoning quality.
+
+Run from the source checkout without model credentials:
+
+```powershell
+python -m examples.adversarial_check --output adversarial-report.json
+```
+
+The report includes every test ID, actual result and duration, grouped into the following gates. Skipped checks are recorded as unverified (`PARTIAL`), never converted to PASS. Gates overlap; their counts must not be summed as independent scenarios. A failed or uncovered gate gives a nonzero exit code. Installed wheels also contain the portable `examples.stress_check` and `examples.housekeeping_check` fixture runners.
+
+| Barrier | Hostile condition | Required outcome |
+| --- | --- | --- |
+| Workspace scope | Traversal, private files, alternate streams, reserved names, symlink/reparse paths | Refuse before an effect; preserve unrelated bytes |
+| Discovery | Deep files, duplicate names, vendor noise, truncated matches, very large sources | Reach the requested section; report skipped/limited coverage |
+| Encoding | CP932/Shift-JIS, UTF BOMs, wrong endian, invalid/truncated sequences, mixed bytes, non-round-tripping aliases, unrepresentable replacement | Preserve encoding, BOM and unrelated bytes exactly, or refuse before approval |
+| Editing | Duplicate snippets, CRLF expansion, large diffs, missing final newline, human edits after proposal | Require unique context; show complete diff; detect stale source |
+| Approval and identity | Wrong actor, wrong fingerprint, repeated decisions, cancellation, declined actions | No unauthorized effect and no false completion |
+| Housekeeping | Destination collision, binary data, source replacement, backup failure, directory becomes nonempty | No clobber; preserve source; persistent backup before deletion; recover byte-for-byte |
+| Git | Mixed staged/unstaged work, HEAD/branch changes, index lock, reappearing deletion, hooks/filters, uncertain publication | Commit only selected, approved bytes; preserve others; report CONFLICT/UNKNOWN; no arbitrary Git command |
+| Execution | Missing command, fail exit, huge output, secret environment, timeout, surviving child, step/capacity limit | Report actual exit/state; bound execution/output; stop owned work; do not invent PASS |
+| Logs | Restart, full/unavailable disk, failed approval persistence | Retain existing records; refuse unrecorded approval; logging failure cannot prevent cancellation |
+| Protocol and separation | Malformed requests/results, duplicate delivery, offline dependencies, architecture leakage | Bound and classify errors; keep host/tool responsibilities separate |
+
+## Added capability scope
+
+File effects use the existing immutable proposal and approval gate: create, copy, move/rename, recoverable file deletion, restore, directory creation, and empty-directory removal. Binary copies and restores are byte-exact. Recovery data is local at `%USERPROFILE%/.code-attach/recycle/<workspace-hash>/` by default; it survives new tool instances. Do not place a custom recovery directory inside the workspace. Directory trees are not recursively removed or moved. Multi-operation changes are not atomic.
+
+BOM-based UTF-8/16/32 is detected. Known CP932/Shift-JIS and BOM-less endian-specific Unicode must be selected explicitly using `encoding`. There is no heuristic fallback or replacement-character decoding. Original-byte round-trip is required. New text files can explicitly select an encoding. A wrong selection that still round-trips cannot establish the semantic correctness of the displayed text; the tool does not claim to detect all possible mixed encodings.
+
+Git investigation includes status, working/staged diffs, recent log and branches. Local commits require an existing branch with history, no staged changes, explicit individual paths, and an exact HEAD/branch/index/file snapshot. File mode and the expected blob after Git's built-in EOL/encoding conversion are pinned too, and changed conversion is a conflict. Commit objects and a temporary index are prepared separately; Git's index lock and compare-and-swap ref update guard publication. Working-file bytes are preserved. Hooks, external filters, and signing are disabled, and the local commit identity is `code-attach <code-attach@localhost>`. Custom filter transformations and ordinary hook execution are not provided. A lost/failed publication or index update is UNKNOWN and can retain `index.lock` for inspection. No automatic retry or force operation follows uncertainty.
+
+## Remaining barriers
+
+Merge, rebase, cherry-pick, force/reset/clean, remote operations, recursive tree deletion, a separate OS privilege sandbox, crash-resumable execution, and real-model prompt-injection resistance are not implemented by these gates. Unsupported actions must be refused; passing tool fixtures must not be presented as proof that those capabilities work. Complex Git operations require their own preview, conflict-resolution, abort/recovery and lost-response fixtures before being exposed.
+
+Every new capability or observed defect must add a fixture with an observable invariant. CI is configured to run the full gates on Windows and Linux and retain the JSON evidence; remote CI success must be checked separately from a local run. Adding a capability without its negative/recovery cases is not sufficient.

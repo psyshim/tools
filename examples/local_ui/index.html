@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="ja">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Code Attach — ローカル開発</title><link rel="stylesheet" href="/app.css"><script src="/app.js" defer></script></head>
+<body>
+<main>
+  <header><div class="eyebrow">CODE ATTACH / LOCAL WORKSPACE</div><h1>コードを直す。<br>変更を確かめる。</h1><p id="workspace">接続を確認しています…</p><span id="mode"></span></header>
+  <section class="panel" aria-label="作業指示">
+    <form id="task-form"><label for="instruction">やりたいこと</label><textarea id="instruction" required maxlength="16384" placeholder="不具合の症状や、実現したい動作を書いてください。" rows="4"></textarea><div class="actions"><button id="start" disabled>作業を開始</button><button id="cancel" type="button" class="secondary" disabled>停止</button><span id="state" role="status">未接続</span></div></form>
+    <p id="error" role="alert"></p>
+  </section>
+  <section aria-label="作業の記録"><div class="section-title"><h2>作業の記録</h2><span>編集とテストは承認後に実行</span></div><div id="events" aria-live="polite"><p class="empty">ここに調査・変更案・実行結果が表示されます。</p></div></section>
+  <footer>ローカル専用 · 再起動で作業状態はリセットされます。記録はローカルに保存されます。<p id="log-dir"></p></footer>
+</main>
+</body></html>

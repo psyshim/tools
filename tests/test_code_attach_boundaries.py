@@ -19,8 +19,13 @@ HOST_ALLOWED_RELATIVE = {"engine", "router", "providers", ""}
 AGENT_FORBIDDEN = {"fastapi", "starlette", "pydantic", "host_mock"} | NETWORK
 AGENT_RULES = {
     "engine.py": (AGENT_FORBIDDEN | {"subprocess", "coding_agent"}, {"session", "tools"}),
-    "session.py": (AGENT_FORBIDDEN | {"subprocess", "coding_agent"}, {"tools"}),
-    "tools.py": (AGENT_FORBIDDEN, set()),
+    "session.py": (AGENT_FORBIDDEN | {"subprocess", "coding_agent"}, {"schemas", "tools"}),
+    "tools.py": (AGENT_FORBIDDEN | {"subprocess"}, {"globs", "privacy", "schemas", "testrun"}),
+    "schemas.py": (AGENT_FORBIDDEN | {"subprocess", "coding_agent"}, set()),
+    "globs.py": (AGENT_FORBIDDEN | {"subprocess", "coding_agent"}, set()),
+    "privacy.py": (AGENT_FORBIDDEN | {"subprocess", "coding_agent"}, set()),
+    "testrun.py": (AGENT_FORBIDDEN | {"coding_agent"}, set()),  # the only module that starts processes
+    "activity.py": (AGENT_FORBIDDEN | {"subprocess"}, set()),
 }
 
 def imports(path):

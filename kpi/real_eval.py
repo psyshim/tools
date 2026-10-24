@@ -25,7 +25,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from code_attach.engine import Engine  # noqa: E402
 from code_attach.providers import from_anthropic, from_openai, to_anthropic, to_openai  # noqa: E402
-from tests.test_code_attach_project import build  # noqa: E402
+from kpi.fixture import build  # noqa: E402
 
 PY = sys.executable
 CR, LF = chr(13), chr(10)
