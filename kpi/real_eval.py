@@ -3,7 +3,9 @@
 Scoring checks the FILESYSTEM and the real test run, never the model's own claims. Collateral changes outside the
 allowed set fail the scenario. Real runs are recorded under kpi/real_runs/ and feed the real-model KPI.
 
-  python -m kpi.real_eval --provider openai --model MODEL --trials 3      (OPENAI_API_KEY, optional OPENAI_BASE_URL)
+  python -m kpi.real_eval --provider custom --complete pkg.module:func --model NAME --trials 3
+      func(messages, tools) -> {"text", "tool_calls"}; how it reaches the model (and any auth) is entirely its own business.
+  python -m kpi.real_eval --provider openai --model MODEL --trials 3      (optional; OPENAI_API_KEY, OPENAI_BASE_URL)
   python -m kpi.real_eval --provider anthropic --model MODEL --trials 3   (ANTHROPIC_API_KEY)
   python -m kpi.real_eval --provider mock-liar                            (harness self-test; never recorded)
 """
@@ -168,12 +170,17 @@ def oracle_retry_model(messages, tools):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--provider", required=True, choices=["openai", "anthropic", "mock-liar"])
+    ap.add_argument("--provider", required=True, choices=["custom", "openai", "anthropic", "mock-liar"])
+    ap.add_argument("--complete", help="module:function for --provider custom")
     ap.add_argument("--model", default="mock")
     ap.add_argument("--trials", type=int, default=3)
     ap.add_argument("--only")
     a = ap.parse_args()
-    complete = {"openai": lambda: openai_model(a.model), "anthropic": lambda: anthropic_model(a.model), "mock-liar": lambda: liar_model}[a.provider]()
+    def load_custom():
+        import importlib
+        mod, _, fn = a.complete.partition(":")
+        return getattr(importlib.import_module(mod), fn)
+    complete = {"custom": load_custom, "openai": lambda: openai_model(a.model), "anthropic": lambda: anthropic_model(a.model), "mock-liar": lambda: liar_model}[a.provider]()
     records = []
     for sc in SCENARIOS:
         if a.only and sc["id"] != a.only:
