@@ -1,7 +1,12 @@
 """Agent-side facade. Owns task registry, idempotency and ownership. Knows nothing about HTTP or the host's auth."""
+import hashlib
 import threading
 from .session import Task, TERMINAL
 from .tools import ToolBox
+
+def _ref(value):
+    """Opaque stable reference; raw paths and user ids must not appear in events or logs."""
+    return hashlib.sha256(str(value).encode("utf-8")).hexdigest()[:12]
 
 class NotFound(Exception):
     pass
@@ -13,11 +18,12 @@ class Busy(Exception):
     pass
 
 class Engine:
-    def __init__(self, complete, test_commands=None, max_tasks=64, test_timeout=180):
+    def __init__(self, complete, test_commands=None, max_tasks=64, test_timeout=180, event_sink=None):
         self._complete = complete
         self._tests = dict(test_commands or {})
         self._max = max_tasks
         self._timeout = test_timeout
+        self._event_sink = event_sink
         self._tasks, self._keys, self._content = {}, {}, {}
         self._lock = threading.Lock()
 
@@ -36,7 +42,9 @@ class Engine:
                 return task.id, task.state
             if len(self._tasks) >= self._max:
                 raise Busy()
-            task = Task(principal, ToolBox(root, self._tests, self._timeout), self._complete, instruction)
+            task = Task(principal, ToolBox(root, self._tests, self._timeout), self._complete, instruction,
+                        event_sink=self._event_sink)
+            task.emit("task_started", {"instruction": instruction, "workspace_ref": _ref(root), "principal_ref": _ref(principal)}, private=True)
             self._tasks[task.id], self._keys[key], self._content[task.id] = task, task.id, content
         task.start()
         return task.id, task.state

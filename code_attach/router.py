@@ -13,10 +13,10 @@ class Decision(BaseModel):
     fingerprint: str
     approve: bool
 
-def make_router(complete, authorize, resolve_workspace, test_commands=None, max_tasks=64, test_timeout=180):
+def make_router(complete, authorize, resolve_workspace, test_commands=None, max_tasks=64, test_timeout=180, event_sink=None):
     """complete(messages, tools) -> {"text", "tool_calls"}; authorize(request) -> principal (raise HTTPException on failure);
     resolve_workspace(principal, workspace_id) -> local directory path or None; test_commands: {name: argv list}."""
-    engine = Engine(complete, test_commands, max_tasks, test_timeout)
+    engine = Engine(complete, test_commands, max_tasks, test_timeout, event_sink)
     router = APIRouter()
 
     def guarded(fn, *args):
@@ -24,6 +24,8 @@ def make_router(complete, authorize, resolve_workspace, test_commands=None, max_
             return fn(*args)
         except NotFound:
             raise HTTPException(404, "not found")
+        except OSError:
+            raise HTTPException(503, "activity log unavailable")
 
     @router.get("/availability")
     def availability(request: Request):
@@ -42,6 +44,8 @@ def make_router(complete, authorize, resolve_workspace, test_commands=None, max_
             raise HTTPException(409, "idempotency key reused with different content")
         except Busy:
             raise HTTPException(429, "too many tasks")
+        except OSError:
+            raise HTTPException(503, "activity log unavailable")
         return {"task_id": task_id, "state": state}
 
     @router.get("/tasks/{task_id}/events")

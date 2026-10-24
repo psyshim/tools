@@ -12,7 +12,7 @@ SYSTEM = (
 TERMINAL = {"COMPLETED", "FAILED", "CANCELLED"}
 
 class Task:
-    def __init__(self, principal, toolbox, complete, instruction, max_steps=20, approval_timeout=600):
+    def __init__(self, principal, toolbox, complete, instruction, max_steps=20, approval_timeout=600, event_sink=None):
         self.id = uuid.uuid4().hex
         self.principal = principal
         self.toolbox = toolbox
@@ -21,6 +21,7 @@ class Task:
         self.approval_timeout = approval_timeout
         self.state = "RUNNING"
         self.events = []
+        self._event_sink = event_sink
         self.pending = None
         self._cancel = False
         self._cv = threading.Condition()
@@ -30,9 +31,14 @@ class Task:
     def start(self):
         self.thread.start()
 
-    def emit(self, type_, data):
+    def emit(self, type_, data, private=False):
+        """private events go to the activity sink only and are never visible through events_after()."""
         with self._cv:
-            self.events.append({"id": str(len(self.events) + 1), "type": type_, "data": data})
+            event = {"id": ("p" if private else "") + str(len(self.events) + 1), "type": type_, "data": data}
+            if self._event_sink is not None:
+                self._event_sink(self.id, event)
+            if not private:
+                self.events.append(event)
             self._cv.notify_all()
 
     def events_after(self, after=0):
@@ -41,6 +47,14 @@ class Task:
 
     def cancel(self):
         with self._cv:
+            if self.state in TERMINAL or self._cancel:
+                return
+            try:
+                self.emit("cancel_requested", {})
+            except OSError:
+                # A full/unavailable log disk must never prevent stopping work.
+                self.events.append({"id": str(len(self.events) + 1), "type": "cancel_requested",
+                                    "data": {"log_error": "activity log unavailable"}})
             self._cancel = True
             self._cv.notify_all()
 
@@ -49,6 +63,7 @@ class Task:
             p = self.pending
             if not p or p["action_id"] != action_id or p["fingerprint"] != fingerprint or p["decision"] is not None:
                 return False
+            self.emit("approval_decision", {"action_id": action_id, "fingerprint": fingerprint, "approve": bool(approve)})
             p["decision"] = bool(approve)
             self._cv.notify_all()
             return True
@@ -56,7 +71,14 @@ class Task:
     def _finish(self, state, detail=None):
         with self._cv:
             self.state = state
-        self.emit("state", {"state": state, **({"detail": detail} if detail else {})})
+            try:
+                self.emit("state", {"state": state, **({"detail": detail} if detail else {})})
+            except OSError:
+                # Logging failure cannot leave a worker stuck or read as success.
+                self.state = "FAILED"
+                self.events.append({"id": str(len(self.events) + 1), "type": "state",
+                                    "data": {"state": "FAILED", "detail": "activity log unavailable"}})
+                self._cv.notify_all()
 
     def _await(self, name, args, call_id):
         summary, fingerprint = self.toolbox.describe_effect(name, args)
@@ -79,6 +101,8 @@ class Task:
                 if self._cancel:
                     return self._finish("CANCELLED")
                 reply = self.complete(self.messages, self.toolbox.schemas())
+                if self._cancel:
+                    return self._finish("CANCELLED")
                 text, calls = reply.get("text") or "", reply.get("tool_calls") or []
                 if text:
                     self.emit("assistant", {"text": text})
@@ -102,6 +126,6 @@ class Task:
                 return {"status": "NOT_APPROVED"}
             result = self.toolbox.call(name, args)
         except (ValueError, KeyError, TypeError, OSError, UnicodeError) as exc:
-            result = {"status": "ERROR", "error": f"{type(exc).__name__}: {exc}"}
+            result = {"status": "ERROR", "error": self.toolbox.scrub(f"{type(exc).__name__}: {exc}")}
         self.emit("tool_result", {"tool": name, "result": result})
         return result

@@ -1,5 +1,6 @@
 """Tools the model may call. Side effects (apply, run_tests) are gated by approval in session.py."""
 import difflib
+import getpass
 import hashlib
 import fnmatch
 import json
@@ -12,6 +13,8 @@ from coding_agent.workflow import Workflow, Conflict
 from coding_agent.workspace import Workspace
 
 MAX_OUTPUT = 8000
+MAX_FILE_BYTES = 8 * 1024 * 1024
+MAX_DIFF = 64000
 SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__", ".mypy_cache", ".pytest_cache", ".tox", "dist", "build", ".idea"}
 MAX_FILES_SCANNED = 20000
 MAX_MATCHES = 50
@@ -25,9 +28,9 @@ SCHEMAS = [
      "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "depth": {"type": "integer"}}}},
     {"name": "find_files", "description": "Find files by glob (e.g. '*.ini', 'settings*', 'src/**/*.py') anywhere under a directory, skipping build/vendor/VCS folders.",
      "parameters": {"type": "object", "properties": {"pattern": {"type": "string"}, "path": {"type": "string"}}, "required": ["pattern"]}},
-    {"name": "search_text", "description": "Case-insensitive substring search across text files under a directory. Use it to locate code, config or docs whose location is unknown.",
-     "parameters": {"type": "object", "properties": {"query": {"type": "string"}, "path": {"type": "string"}, "glob": {"type": "string"}}, "required": ["query"]}},
-    {"name": "read_file", "description": "Read lines of a text file (max 200 lines per call).",
+    {"name": "search_text", "description": "Case-insensitive substring search across UTF-8 text files up to 8 MiB. Returns at most five hits per file; set start_line to continue after the last returned line.",
+     "parameters": {"type": "object", "properties": {"query": {"type": "string"}, "path": {"type": "string"}, "glob": {"type": "string"}, "start_line": {"type": "integer"}}, "required": ["query"]}},
+    {"name": "read_file", "description": "Read a UTF-8 file up to 8 MiB (max 200 lines per call). Set start_line to read a later page; end_line is optional.",
      "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "start_line": {"type": "integer"}, "end_line": {"type": "integer"}}, "required": ["path"]}},
     {"name": "propose_edit", "description": "Propose replacing one exact, unique text occurrence in a file. Nothing is written until apply_proposal is approved.",
      "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "old": {"type": "string"}, "new": {"type": "string"}}, "required": ["path", "old", "new"]}},
@@ -44,12 +47,27 @@ def _digest(obj):
 
 class ToolBox:
     def __init__(self, root, test_commands=None, test_timeout=180):
-        self.ws = Workspace(root)
-        self.flow = Workflow(root)
+        self.ws = Workspace(root, max_file_bytes=MAX_FILE_BYTES)
+        self.flow = Workflow(root, max_file_bytes=MAX_FILE_BYTES)
         self.test_commands = dict(test_commands or {})
         self.test_timeout = test_timeout
         self.proposals = {}
         self._lock = threading.Lock()
+
+    def scrub(self, text):
+        """Remove absolute workspace path, home directory and OS user name from text that leaves this process."""
+        if not isinstance(text, str):
+            return text
+        bases = {str(self.ws.root): "<workspace>", self.ws.root.as_posix(): "<workspace>"}
+        home = Path.home()
+        bases.update({str(home): "~", home.as_posix(): "~"})
+        for base in sorted(bases, key=len, reverse=True):
+            text = text.replace(base, bases[base])
+        try:
+            user = getpass.getuser()
+        except Exception:
+            user = ""
+        return text.replace(user, "<user>") if len(user) >= 3 else text
 
     def schemas(self):
         return [s for s in SCHEMAS if s["name"] != "run_tests" or self.test_commands]
@@ -66,7 +84,7 @@ class ToolBox:
             if not argv:
                 raise ValueError("unknown test command")
             summary = {"kind": "run_tests", "name": args["name"], "argv": argv}
-            return summary, _digest(summary)
+            return {**summary, "argv": [self.scrub(a) for a in argv]}, _digest(summary)
         raise ValueError("not an effect tool")
 
     def call(self, name, args):
@@ -81,8 +99,15 @@ class ToolBox:
     def t_list_dir(self, path=".", depth=1):
         return {"entries": self.ws.list_directory(path, depth)}
 
-    def t_read_file(self, path, start_line=1, end_line=200):
-        return self.ws.read_file(path, start_line, min(end_line, start_line + 199))
+    def t_read_file(self, path, start_line=1, end_line=None):
+        if type(start_line) is not int or start_line < 1:
+            raise ValueError("invalid start_line")
+        if end_line is None:
+            end_line = start_line + 199
+        result = self.ws.read_file(path, start_line, min(end_line, start_line + 199))
+        if sum(len(line) for line in result["lines"]) > 32000:
+            raise ValueError("requested lines exceed 32000 characters; request a smaller range")
+        return result
 
     def _files(self, path):
         base = self.ws._resolve(path)
@@ -115,38 +140,47 @@ class ToolBox:
                 hits.append(rel)
         return {"files": hits, "truncated": truncated}
 
-    def t_search_text(self, query, path=".", glob=None):
+    def t_search_text(self, query, path=".", glob=None, start_line=1):
         if not isinstance(query, str) or not query or len(query) > 200:
             raise ValueError("invalid query")
+        if type(start_line) is not int or start_line < 1:
+            raise ValueError("invalid start_line")
         needle, matches, truncated, extra = query.lower(), [], False, {}
+        skipped_large = 0
         for f in self._files(path):
             rel = f.relative_to(self.ws.root).as_posix()
             if glob and not (fnmatch.fnmatch(rel, glob) or fnmatch.fnmatch(f.name, glob)):
                 continue
             try:
-                if f.stat().st_size > 1048576:
+                if f.stat().st_size > MAX_FILE_BYTES:
+                    skipped_large += 1
                     continue
                 data = f.read_bytes()
+                if len(data) > MAX_FILE_BYTES:
+                    skipped_large += 1
+                    continue
             except OSError:
                 continue
             if bytes([0]) in data[:4096]:
                 continue
             in_file = 0
             for n, line in enumerate(data.decode("utf-8", "replace").splitlines(), 1):
-                if needle not in line.lower():
+                if n < start_line or needle not in line.lower():
                     continue
                 in_file += 1
                 if in_file > MAX_PER_FILE:  # a noisy file must not crowd out other files
                     extra[rel] = extra.get(rel, 0) + 1
                 elif len(matches) >= MAX_MATCHES:
-                    return {"matches": matches, "truncated": True, "more_in_file": extra}
+                    return {"matches": matches, "truncated": True, "more_in_file": extra, "skipped_large_files": skipped_large}
                 else:
                     matches.append({"path": rel, "line": n, "text": line.strip()[:200]})
-        return {"matches": matches, "truncated": truncated, "more_in_file": extra}
+        return {"matches": matches, "truncated": truncated, "more_in_file": extra, "skipped_large_files": skipped_large}
 
     # --- proposals (no writes) ---
     def _store(self, path, kind, old, new, before, after, sha):
-        diff = "".join(difflib.unified_diff(before.splitlines(True), after.splitlines(True), f"a/{path}", f"b/{path}"))[:MAX_OUTPUT]
+        diff = "".join(difflib.unified_diff(before.splitlines(True), after.splitlines(True), f"a/{path}", f"b/{path}"))
+        if len(diff) > MAX_DIFF:
+            raise ValueError("proposal diff too large; split into smaller edits")
         pid = uuid.uuid4().hex[:12]
         body = {"path": path, "kind": kind, "old": old, "new": new, "sha": sha}
         with self._lock:
@@ -158,9 +192,14 @@ class ToolBox:
         text = self.ws._resolve(path).read_bytes().decode("utf-8")
         if CRLF in text and CR not in old:  # CRLF file: the model writes LF
             old, new = old.replace(LF, CRLF), new.replace(LF, CRLF)
+        if len(old) > 20000 or len(new) > 20000:
+            raise ValueError("invalid edit size; split into edits of at most 20000 characters")
         if not old or text.count(old) != 1:
             raise ValueError("old text must occur exactly once")
-        return self._store(path, "edit", old, new, text, text.replace(old, new, 1), info["sha256"])
+        after = text.replace(old, new, 1)
+        if len(after.encode("utf-8")) > MAX_FILE_BYTES:
+            raise ValueError("updated file too large")
+        return self._store(path, "edit", old, new, text, after, info["sha256"])
 
     def t_propose_new_file(self, path, content):
         target = self.ws._resolve(path)
@@ -196,10 +235,10 @@ class ToolBox:
         try:
             r = subprocess.run(argv, cwd=self.ws.root, capture_output=True, timeout=self.test_timeout, stdin=subprocess.DEVNULL)
         except subprocess.TimeoutExpired as exc:
-            return {"status": "TIMEOUT", "argv": argv, "output": _tail((exc.stdout or b"") + (exc.stderr or b""))}
+            return {"status": "TIMEOUT", "argv": [self.scrub(a) for a in argv], "output": self.scrub(_tail((exc.stdout or b"") + (exc.stderr or b"")))}
         except OSError as exc:
-            return {"status": "UNKNOWN", "argv": argv, "error": type(exc).__name__}
-        return {"status": "PASS" if r.returncode == 0 else "FAIL", "exit_code": r.returncode, "argv": argv, "output": _tail(r.stdout + r.stderr)}
+            return {"status": "UNKNOWN", "argv": [self.scrub(a) for a in argv], "error": type(exc).__name__}
+        return {"status": "PASS" if r.returncode == 0 else "FAIL", "exit_code": r.returncode, "argv": [self.scrub(a) for a in argv], "output": self.scrub(_tail(r.stdout + r.stderr))}
 
 def _tail(data):
     return data.decode("utf-8", "replace")[-MAX_OUTPUT:]

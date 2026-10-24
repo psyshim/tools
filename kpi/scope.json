@@ -418,6 +418,30 @@
     "tests.test_code_attach.CodeAttachTests.test_fix_and_test_with_approvals"
    ],
    "integration": null
+  },
+  {
+   "id": "R23",
+   "title": "No absolute path, home dir or user name in frontend events, model context or logs",
+   "doc": [
+    "docs/HOST_HANDOFF.md",
+    "never leave the process"
+   ],
+   "code": [
+    [
+     "code_attach/tools.py",
+     "def scrub"
+    ],
+    [
+     "code_attach/engine.py",
+     "def _ref"
+    ]
+   ],
+   "tests": [
+    "tests.test_code_attach_privacy.PrivacyTests.test_no_personal_or_absolute_path_in_events_sink_or_model_context",
+    "tests.test_code_attach_privacy.PrivacyTests.test_started_record_is_private_and_uses_opaque_refs",
+    "tests.test_code_attach_privacy.PrivacyTests.test_oserror_text_is_scrubbed"
+   ],
+   "integration": null
   }
  ],
  "deferred": [
