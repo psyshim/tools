@@ -110,7 +110,8 @@ def handler_factory(token, control_token, store=None, actor_tokens=None):
             return self.send(202, {"task_id":task_id, "state":"QUEUED", "event_cursor":"0"})
 
         def do_GET(self):
-            if not self.auth(token):
+            actor = next((name for secret, name in actors.items() if self.auth(secret)), None)
+            if actor is None:
                 return self.send(401, {"error":"unauthorized"})
             if self.path == "/v1/capabilities":
                 return self.send(200, {"protocol":"1.0", "capabilities":["tasks","events"], "mock":True})
