@@ -21,3 +21,5 @@ jobs:
           python -m unittest discover -s tests -p 'test_fault_service.py' -v
           python -m unittest discover -s tests -p 'test_adversarial_recovery.py' -v
           python -m unittest discover -s tests -p 'test_architecture_boundaries.py' -v
+          python -m unittest discover -s tests -p 'test_journal.py' -v
+          python -m unittest discover -s tests -p 'test_journaled_edit.py' -v
