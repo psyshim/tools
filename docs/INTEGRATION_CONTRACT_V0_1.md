@@ -9,10 +9,10 @@
 | Capability | Implemented | Exposed to host | Evidence |
 | --- | --- | --- | --- |
 | Workspace list/read | Yes | Only Local Agent loopback | `coding_agent/workspace.py`, `coding_agent/service.py` |
-| Mock relay of read calls | Yes | Development mock only | `coding_agent/mock_backend.py` |
+| Mock relay of read calls | Yes | Development mock only | `host_mock/server.py` |
 | Experimental replace-by-hash | Yes (single-process helper) | No | `coding_agent/patching.py` |
 | Experimental unique-text replacement, Python syntax check | Yes (local callable helper) | No | `coding_agent/workflow.py` |
-| Task orchestration / event cursor / durable journal | No | No | planned |
+| Task orchestration / event cursor / durable journal | No | No | Journal prototype exists (`coding_agent/journal.py`, sqlite) but is not conformant (no schema version, actor, approval, or recovery classifier); event cursor and orchestration planned |
 | AI model / MCP engine / terminal / Git commit | No | No | planned |
 | Authenticated cloud relay / remote VS Code control | No | No | planned |
 
