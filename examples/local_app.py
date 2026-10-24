@@ -109,7 +109,7 @@ def create_app(workspace, complete, token, test_commands=None, demo=False, log_d
 
     app.include_router(make_router(complete, authorize,
                                   lambda principal, wid: str(root) if wid == "project" else None,
-                                  test_commands, event_sink=activity.record), prefix="/api/code")
+                                  test_commands, event_sink=activity.record, allow_mutation=True), prefix="/api/code")
     return app
 
 

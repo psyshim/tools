@@ -20,7 +20,7 @@ from .globs import SKIP_DIRS, glob_match  # noqa: F401  (re-exported)
 from .matching import adapt_eol, locate
 from .outline import word_pattern
 from .privacy import Scrubber
-from .schemas import SCHEMAS
+from .schemas import EFFECT_TOOLS, SCHEMAS
 from .testrun import CommandRunner, normalize_commands
 from .tools_edit import EditTools
 from .tools_nav import NavTools
@@ -47,11 +47,12 @@ def _excerpt(line, at):
 class ToolBox(NavTools, EditTools):
     """Everything the model can ask for, bound to one workspace. Proposals are created here; effects happen only in
     t_apply_proposal / t_run_tests, which Task calls after an approval. See docs/MAINTAINING_CODE_ATTACH.md."""
-    def __init__(self, root, test_commands=None, test_timeout=180, test_env=None, recycle_dir=None):
+    def __init__(self, root, test_commands=None, test_timeout=180, test_env=None, recycle_dir=None, allow_mutation=True):
         self.ws = Workspace(root, max_file_bytes=MAX_FILE_BYTES)
         self.flow = Workflow(root, max_file_bytes=MAX_FILE_BYTES)
         self.files = FileOperations(root, max_file_bytes=MAX_FILE_BYTES, recycle_dir=recycle_dir)
         self._git = None
+        self.allow_mutation = bool(allow_mutation)   # False = read/propose only: no tool can change disk, run a command or commit
         self.command_specs = normalize_commands(test_commands)
         self.test_commands = {name: spec["argv"] for name, spec in self.command_specs.items()}  # name -> argv view
         self.test_timeout = test_timeout
@@ -74,6 +75,8 @@ class ToolBox(NavTools, EditTools):
     def schemas(self):
         out = []
         for schema in SCHEMAS:
+            if not self.allow_mutation and (schema["name"] in EFFECT_TOOLS or schema["name"] == "propose_undo"):
+                continue
             if schema["name"] == "run_tests":
                 if not self.command_specs:
                     continue
@@ -86,6 +89,7 @@ class ToolBox(NavTools, EditTools):
 
     def describe_effect(self, name, args):
         """Return (summary, fingerprint) shown to the user before approval."""
+        self._require_mutation(name)
         if name == "apply_proposal":
             p = self.proposals.get(args.get("proposal_id"))
             if not p:
@@ -109,13 +113,21 @@ class ToolBox(NavTools, EditTools):
         fn = getattr(self, "t_" + name, None)
         if fn is None or name not in {s["name"] for s in SCHEMAS}:
             raise ValueError("unknown tool")
+        self._require_mutation(name)
         try:
             result = fn(**args)
         except ValueError as exc:
             raise type(exc)(str(exc) + self._path_hint(args)) from None
+        if not self.allow_mutation and name.startswith("propose_") and isinstance(result, dict):
+            result["applied"] = False   # a proposal is a patch artifact here; this installation cannot apply it
+            result["note"] = "read/propose mode: this is a proposal only and nothing was or can be changed by this assistant"
         if name in {"find_files", "search_text"} and isinstance(result, dict):
             result["scan_truncated"] = bool(getattr(self.ws, "scan_truncated", False))  # the walk hit its file limit
         return result
+
+    def _require_mutation(self, name):
+        if not self.allow_mutation and (name in EFFECT_TOOLS or name == "propose_undo"):
+            raise ValueError("this installation is in read/propose mode: changes cannot be applied and commands cannot be run; present the proposal to the user instead")
 
     def _path_hint(self, args):
         """For a path that does not exist, suggest similar names: typos and wrong casing are the commonest tool failure."""
@@ -336,6 +348,7 @@ class ToolBox(NavTools, EditTools):
 
     # --- effects (called only after approval) ---
     def t_apply_proposal(self, proposal_id):
+        self._require_mutation("apply_proposal")
         p = self.proposals.pop(proposal_id, None)
         if p is None:
             raise ValueError("unknown or already used proposal")
@@ -371,4 +384,5 @@ class ToolBox(NavTools, EditTools):
             raise
 
     def t_run_tests(self, name):
+        self._require_mutation("run_tests")
         return self.runner.run(name)

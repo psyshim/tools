@@ -104,7 +104,7 @@ class LocalAppTests(unittest.TestCase):
         def unavailable(task_id, event):
             raise OSError("disk full")
         app = FastAPI()
-        app.include_router(make_router(complete, lambda r: "local", lambda p, w: self.root, event_sink=unavailable))
+        app.include_router(make_router(complete, lambda r: "local", lambda p, w: self.root, event_sink=unavailable, allow_mutation=True))
         response = TestClient(app).post("/tasks", json={"workspace_id": "project", "instruction": "fix", "idempotency_key": "one"})
         self.assertEqual(response.status_code, 503)
         complete.assert_not_called()

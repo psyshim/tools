@@ -7,6 +7,10 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from code_attach import make_router
+
+def make_router_rw(*args, **kwargs):
+    return make_router(*args, allow_mutation=True, **kwargs)  # these tests exercise approval + apply
+
 from code_attach.providers import from_anthropic, from_openai, to_anthropic, to_openai
 
 BUGGY = "def add(a, b):\n    return a - b\n"
@@ -34,7 +38,7 @@ class Env:
                 raise HTTPException(401)
             return user
         cmds = {"unit": [sys.executable, "test_calc.py"]} if tests else None
-        app.include_router(make_router(scripted(steps), authorize, lambda p, w: str(self.root) if (p, w) == ("alice", "ws1") else None, cmds), prefix="/code")
+        app.include_router(make_router_rw(scripted(steps), authorize, lambda p, w: str(self.root) if (p, w) == ("alice", "ws1") else None, cmds), prefix="/code")
         self.client = TestClient(app)
 
     def start(self, user="alice", key="k1", text="fix add"):
@@ -76,7 +80,7 @@ class CodeAttachTests(unittest.TestCase):
             return {"text": "done", "tool_calls": []}
         env = Env([])
         app = FastAPI()
-        app.include_router(make_router(complete, lambda r: "alice", lambda p, w: str(env.root), {"unit": [sys.executable, "test_calc.py"]}))
+        app.include_router(make_router_rw(complete, lambda r: "alice", lambda p, w: str(env.root), {"unit": [sys.executable, "test_calc.py"]}))
         client = TestClient(app)
         tid = client.post("/tasks", json={"workspace_id": "ws1", "instruction": "fix", "idempotency_key": "a"}).json()["task_id"]
         def pend(n):
@@ -115,7 +119,7 @@ class CodeAttachTests(unittest.TestCase):
                 return {"text": "", "tool_calls": [call(2, "apply_proposal", proposal_id=json.loads(messages[-1]["content"])["proposal_id"])]}
             return {"text": "stopped", "tool_calls": []}
         app = FastAPI()
-        app.include_router(make_router(complete, lambda r: "alice", lambda p, w: str(env.root)))
+        app.include_router(make_router_rw(complete, lambda r: "alice", lambda p, w: str(env.root)))
         c = TestClient(app)
         tid = c.post("/tasks", json={"workspace_id": "w", "instruction": "x", "idempotency_key": "a"}).json()["task_id"]
         for _ in range(300):

@@ -25,6 +25,8 @@ Primitives live in `coding_agent/` (`Workspace` path policy and walking, `Workfl
 
 ## Invariants (each has a test; do not weaken)
 
+0. **Default posture is read/propose.** `make_router` defaults to `allow_mutation=False`; in that mode apply, run_tests and undo are not offered to the model, are refused if called, and no approval card can exist (`tests/test_code_attach_posture.py`). Enabling mutation is an explicit local-experimental choice (playbook phase 6 gates any real use).
+
 1. Nothing is written, deleted, moved or committed before an approval event whose `fingerprint` the caller echoes back. Proposals are stored with their fingerprint; apply uses the stored proposal, never model-supplied content.
 2. Stale files give `CONFLICT`; a transient OS error keeps the proposal retryable.
 3. Test commands are fixed argv lists chosen by the host; the model picks only a name. They run with an allowlisted environment and are killed as a process tree on timeout/cancel.

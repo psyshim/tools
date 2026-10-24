@@ -24,13 +24,14 @@ class BadWorkspace(Exception):
 class Engine:
     """Task registry for one host: start/observe/decide/cancel with per-principal ownership, idempotency keys,
     a cap on ACTIVE tasks and bounded retention of finished ones. Knows nothing about HTTP or authentication."""
-    def __init__(self, complete, test_commands=None, max_tasks=64, test_timeout=180, event_sink=None, test_env=None, keep_finished=256, recycle_dir=None):
+    def __init__(self, complete, test_commands=None, max_tasks=64, test_timeout=180, event_sink=None, test_env=None, keep_finished=256, recycle_dir=None, allow_mutation=True):
         self._complete = complete
         self._tests = normalize_commands(test_commands)
         self._max = max_tasks
         self._timeout = test_timeout
         self._test_env = test_env
         self._recycle_dir = recycle_dir
+        self._allow_mutation = bool(allow_mutation)
         self._keep = keep_finished
         self._event_sink = event_sink
         self._tasks, self._keys, self._content = {}, {}, {}
@@ -38,7 +39,13 @@ class Engine:
 
     @property
     def modes(self):
+        if not self._allow_mutation:
+            return ["read", "propose"]
         return ["read", "propose", "apply"] + (["test"] if self._tests else [])
+
+    @property
+    def mutation_enabled(self):
+        return self._allow_mutation
 
     def start(self, principal, root, idempotency_key, instruction):
         """root is a directory the host already authorized for principal. Returns (task_id, state)."""
@@ -53,7 +60,7 @@ class Engine:
             if sum(t.state not in TERMINAL for t in self._tasks.values()) >= self._max:
                 raise Busy()
             try:
-                toolbox = ToolBox(root, self._tests, self._timeout, self._test_env, recycle_dir=self._recycle_dir)
+                toolbox = ToolBox(root, self._tests, self._timeout, self._test_env, recycle_dir=self._recycle_dir, allow_mutation=self._allow_mutation)
             except (OSError, ValueError):
                 raise BadWorkspace()
             task = Task(principal, toolbox, self._complete, instruction, event_sink=self._event_sink)

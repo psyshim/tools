@@ -35,10 +35,12 @@ async def read_model(request, model):
     except ValidationError as exc:
         raise HTTPException(422, [{"field": ".".join(str(p) for p in e["loc"]), "problem": e["type"]} for e in exc.errors()])
 
-def make_router(complete, authorize, resolve_workspace, test_commands=None, max_tasks=64, test_timeout=180, event_sink=None, test_env=None, recycle_dir=None):
+def make_router(complete, authorize, resolve_workspace, test_commands=None, max_tasks=64, test_timeout=180, event_sink=None, test_env=None, recycle_dir=None, allow_mutation=False):
     """complete(messages, tools) -> {"text", "tool_calls"}; authorize(request) -> principal (raise HTTPException on failure);
-    resolve_workspace(principal, workspace_id) -> local directory path or None; test_commands: {name: argv list}."""
-    engine = Engine(complete, test_commands, max_tasks, test_timeout, event_sink, test_env, recycle_dir=recycle_dir)
+    resolve_workspace(principal, workspace_id) -> local directory path or None; test_commands: {name: argv list}.
+    allow_mutation=False (the default) is read/propose mode: the assistant returns patch proposals and can neither apply
+    them nor run commands. Enabling it is an explicit, local-experimental decision (see docs/UPSTREAM_MIGRATION_PLAYBOOK.md)."""
+    engine = Engine(complete, test_commands, max_tasks, test_timeout, event_sink, test_env, recycle_dir=recycle_dir, allow_mutation=allow_mutation)
     router = APIRouter()
 
     def current_principal(request: Request):
@@ -54,7 +56,7 @@ def make_router(complete, authorize, resolve_workspace, test_commands=None, max_
 
     @router.get("/availability")
     def availability(principal=Depends(current_principal)):
-        return {"available": True, "modes": engine.modes}
+        return {"available": True, "modes": engine.modes, "mutation": engine.mutation_enabled}
 
     def start(principal, body):
         root = resolve_workspace(principal, body.workspace_id)

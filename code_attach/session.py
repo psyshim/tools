@@ -9,6 +9,11 @@ SYSTEM = (
     "Edits are proposals; the user must approve apply_proposal and run_tests. After applying, run tests if available "
     "and report the actual result. Never claim a file changed or tests passed unless a tool result says so."
 )
+SYSTEM_PROPOSE_ONLY = (
+    "You help with code in the user's local project using the provided tools. You can read, search and PROPOSE changes, but you "
+    "cannot apply them or run anything: every proposal is a patch for the user to review. Say so plainly and never claim that a "
+    "file changed or that tests passed."
+)
 TERMINAL = {"COMPLETED", "FAILED", "CANCELLED"}
 MAX_CALLS_PER_TURN = 32      # a model cannot make one turn arbitrarily expensive
 MAX_TEXT = 65536             # assistant text kept in events and history
@@ -36,7 +41,8 @@ class Task:
         self._private = 0
         self._cv = threading.Condition()   # guards state and the visible event list; never held across sink I/O
         self._emit_lock = threading.Lock()  # serializes emitters so write-ahead logging keeps event order
-        self.messages = [{"role": "system", "text": SYSTEM}, {"role": "user", "text": instruction}]
+        system = SYSTEM if getattr(toolbox, "allow_mutation", True) else SYSTEM_PROPOSE_ONLY
+        self.messages = [{"role": "system", "text": system}, {"role": "user", "text": instruction}]
         self.thread = threading.Thread(target=self._run, daemon=True)
 
     def start(self):

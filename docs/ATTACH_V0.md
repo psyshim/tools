@@ -1,5 +1,15 @@
 # code_attach v0 — host wiring (1-day delivery)
 
+> **STATUS: PROTOTYPE / LOCAL-EXPERIMENTAL. NOT the production integration path. Do not hand this page to the receiving host team.**
+> The accepted architecture is ADR-004: a thin, powerless host client, an independent Coding Service and a separate Device Agent.
+> Mounting `code_attach` in a host process puts filesystem, test-subprocess and Git capabilities into that process, which is exactly
+> the authority inversion ADR-001/003/004 forbid. The staged correction is `docs/UPSTREAM_MIGRATION_PLAYBOOK.md`; the independent
+> assessment is `docs/REVIEW_SONNET_ATTACH_INTEGRATION_2026-10-24.md`.
+> **Safety posture (phase 0):** `make_router(...)` is **read/propose only by default** (`allow_mutation=False`): the assistant returns
+> patch proposals and can neither apply them nor run commands, and `/availability` reports `mutation: false`. Applying, running commands,
+> Git commits and undo exist only after an explicit `allow_mutation=True`, as a local experiment. An approval prompt alone does not make a
+> live-worktree write safe against a concurrent editor save.
+
 **Status:** IMPLEMENTED with a runnable local browser host (`python -m examples.local_app`) and scripted-model integration tests. External chat-product integration and real-model execution remain unverified. See the root README for startup instructions.
 
 ## Deviation from ADR-004 (decided 2026-10-24, owner-approved)

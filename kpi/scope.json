@@ -668,6 +668,33 @@
     "tests.test_code_attach_parsing.ParsingOutput.test_unittest_ok"
    ],
    "integration": null
+  },
+  {
+   "id": "R29",
+   "title": "Phase 0 safety posture: read/propose by default, mutation only by explicit opt-in, prototype labelling",
+   "doc": [
+    "docs/HOST_HANDOFF.md",
+    "STATUS: PROTOTYPE"
+   ],
+   "code": [
+    [
+     "code_attach/router.py",
+     "allow_mutation=False"
+    ],
+    [
+     "code_attach/tools.py",
+     "_require_mutation"
+    ]
+   ],
+   "tests": [
+    "tests.test_code_attach_posture.Posture.test_default_router_offers_no_mutation_and_says_so",
+    "tests.test_code_attach_posture.Posture.test_tools_shown_to_the_model_exclude_every_effect",
+    "tests.test_code_attach_posture.Posture.test_a_model_that_tries_anyway_gets_errors_and_no_approval_card",
+    "tests.test_code_attach_posture.Posture.test_even_direct_calls_and_forged_decisions_cannot_mutate",
+    "tests.test_code_attach_posture.Posture.test_system_prompt_tells_the_model_it_can_only_propose",
+    "tests.test_code_attach_posture.Posture.test_explicit_opt_in_restores_the_approval_flow"
+   ],
+   "integration": null
   }
  ],
  "deferred": [

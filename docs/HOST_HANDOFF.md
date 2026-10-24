@@ -1,5 +1,15 @@
 # Host handoff — one page
 
+> **STATUS: PROTOTYPE / LOCAL-EXPERIMENTAL. NOT the production integration path. Do not hand this page to the receiving host team.**
+> The accepted architecture is ADR-004: a thin, powerless host client, an independent Coding Service and a separate Device Agent.
+> Mounting `code_attach` in a host process puts filesystem, test-subprocess and Git capabilities into that process, which is exactly
+> the authority inversion ADR-001/003/004 forbid. The staged correction is `docs/UPSTREAM_MIGRATION_PLAYBOOK.md`; the independent
+> assessment is `docs/REVIEW_SONNET_ATTACH_INTEGRATION_2026-10-24.md`.
+> **Safety posture (phase 0):** `make_router(...)` is **read/propose only by default** (`allow_mutation=False`): the assistant returns
+> patch proposals and can neither apply them nor run commands, and `/availability` reports `mutation: false`. Applying, running commands,
+> Git commits and undo exist only after an explicit `allow_mutation=True`, as a local experiment. An approval prompt alone does not make a
+> live-worktree write safe against a concurrent editor save.
+
 Goal: the chat backend (FastAPI) gains "modify and test a local project" by writing **only the adapter below**. Everything else (tools, approval, test running, task loop) ships in `code_attach/`.
 
 **You do not**: call any tool yourself, run commands, touch project files, write Git/test logic, add a task state machine, or add retries. If you feel the need to, stop: it belongs to `code_attach`.
