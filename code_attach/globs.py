@@ -2,6 +2,9 @@
 import fnmatch
 import re
 
+# Directories that are build output, dependencies or tool state: skipped when walking a project.
+SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__", ".mypy_cache", ".pytest_cache", ".tox", "dist", "build", ".idea"}
+
 def glob_match(rel, name, pattern):
     """Patterns without '/' match the file name; patterns with '/' match the relative path ('**' spans directories)."""
     if "/" not in pattern:

@@ -12,6 +12,12 @@
 | `schemas.py` | agent | tool schemas, `EFFECT_TOOLS` | hold behavior |
 | `tools.py` | agent | `ToolBox`: the `t_*` tool implementations, proposals, approval summaries | spawn processes, define schemas |
 | `testrun.py` | agent | the only place that starts processes: filtered env, cancel, tree-kill, bounded output | decide what to run (the host's argv list does) |
+| `tools_edit.py` | agent | `EditTools` mixin: line-range edits, atomic batches, notebook cells, applied-change history and undo; all built on whole-file compare-and-swap (`Workflow.replace_bytes`) | write without a stored sha256 of what the proposal was based on |
+| `tools_nav.py` | agent | `NavTools` mixin: `outline_file`, `find_symbol`, `project_overview` (read-only) | execute or write anything |
+| `matching.py` | agent | locating edit targets (line-ending tolerant) and error messages that teach the model | guess across whitespace differences |
+| `outline.py` | agent | pure structure extraction (Python via `ast`, heuristics elsewhere) | do I/O |
+| `detect.py` | agent | project recon and *suggested* commands (read-only) | run anything; a suggestion is never runnable by the model |
+| `testparse.py` | agent | pure parsing of runner/compiler output into failures and diagnostics | decide PASS/FAIL (the exit code does) |
 | `privacy.py` | agent | scrubbing paths/home/user name from anything that leaves the process | |
 | `globs.py` | agent | glob semantics | |
 

@@ -1,4 +1,9 @@
-"""Tools the model may call. Side effects (apply, run_tests) are gated by approval in session.py."""
+"""Tools the model may call. Side effects (apply, run_tests) are gated by approval in session.py.
+
+ToolBox composes: this core (reading, searching, single-edit proposals, file operations, Git, applying, test runs),
+NavTools (outline / symbols / project overview) and EditTools (line ranges, batches, notebooks, undo).
+"""
+import collections
 import difflib
 import errno
 import hashlib
@@ -11,25 +16,35 @@ from coding_agent.file_ops import FileOperations
 from coding_agent.git_ops import GitOperations
 from coding_agent.text_encoding import decode_source, encode_source, encode_new_source, normalize
 
-from .globs import glob_match  # noqa: F401  (re-exported)
+from .globs import SKIP_DIRS, glob_match  # noqa: F401  (re-exported)
+from .matching import adapt_eol, locate
+from .outline import word_pattern
 from .privacy import Scrubber
 from .schemas import SCHEMAS
-from .testrun import CommandRunner
+from .testrun import CommandRunner, normalize_commands
+from .tools_edit import EditTools
+from .tools_nav import NavTools
 
 MAX_FILE_BYTES = 8 * 1024 * 1024
 MAX_DIFF = 64000
-SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__", ".mypy_cache", ".pytest_cache", ".tox", "dist", "build", ".idea"}
+MAX_LINE_CHARS = 2000
 MAX_FILES_SCANNED = 20000
 MAX_MATCHES = 50
 MAX_PER_FILE = 5
-CR, LF = chr(13), chr(10)
-BS = chr(92)
-CRLF = CR + LF
+MAX_TERMS = 5
 
 def _digest(obj):
     return hashlib.sha256(json.dumps(obj, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
 
-class ToolBox:
+def _excerpt(line, at):
+    """Up to 200 characters of a (possibly enormous) line around column `at`."""
+    stripped = line.strip()
+    if len(stripped) <= 200:
+        return stripped
+    start = max(0, at - 80)
+    return ("..." if start else "") + line[start:start + 200].strip() + "..."
+
+class ToolBox(NavTools, EditTools):
     """Everything the model can ask for, bound to one workspace. Proposals are created here; effects happen only in
     t_apply_proposal / t_run_tests, which Task calls after an approval. See docs/MAINTAINING_CODE_ATTACH.md."""
     def __init__(self, root, test_commands=None, test_timeout=180, test_env=None, recycle_dir=None):
@@ -37,12 +52,15 @@ class ToolBox:
         self.flow = Workflow(root, max_file_bytes=MAX_FILE_BYTES)
         self.files = FileOperations(root, max_file_bytes=MAX_FILE_BYTES, recycle_dir=recycle_dir)
         self._git = None
-        self.test_commands = dict(test_commands or {})
+        self.command_specs = normalize_commands(test_commands)
+        self.test_commands = {name: spec["argv"] for name, spec in self.command_specs.items()}  # name -> argv view
         self.test_timeout = test_timeout
         self.test_env = dict(test_env or {})
         self._scrubber = Scrubber(self.ws.root)
-        self.runner = CommandRunner(self.ws.root, self.test_commands, test_timeout, self.test_env, self.scrub)
+        self.runner = CommandRunner(self.ws.root, self.command_specs, test_timeout, self.test_env, self.scrub)
         self.proposals = {}
+        self.applied = collections.OrderedDict()   # undo history (EditTools)
+        self._appliers = {"write": self._apply_write, "write_batch": self._apply_batch}
         self._lock = threading.Lock()
 
     def scrub(self, text):
@@ -54,7 +72,17 @@ class ToolBox:
         self.runner.request_cancel()
 
     def schemas(self):
-        return [s for s in SCHEMAS if s["name"] != "run_tests" or self.test_commands]
+        out = []
+        for schema in SCHEMAS:
+            if schema["name"] == "run_tests":
+                if not self.command_specs:
+                    continue
+                schema = json.loads(json.dumps(schema))  # per-workspace copy: the model sees the commands that really exist
+                schema["parameters"]["properties"]["name"]["enum"] = list(self.command_specs)
+                listing = "; ".join(f"{n}: {s['description']}" if s["description"] else n for n, s in self.command_specs.items())
+                schema["description"] += " Available: " + listing
+            out.append(schema)
+        return out
 
     def describe_effect(self, name, args):
         """Return (summary, fingerprint) shown to the user before approval."""
@@ -64,11 +92,15 @@ class ToolBox:
                 raise ValueError("unknown proposal")
             return p.get("summary", {"kind": "apply", "path": p["path"], "diff": p["diff"], "encoding": p.get("encoding", "utf-8")}), p["fingerprint"]
         if name == "run_tests":
-            argv = self.test_commands.get(args.get("name"))
-            if not argv:
-                raise ValueError("unknown test command")
-            summary = {"kind": "run_tests", "name": args["name"], "argv": argv}
-            return {**summary, "argv": [self.scrub(a) for a in argv]}, _digest(summary)
+            spec = self.command_specs.get(args.get("name"))
+            if not spec:
+                raise ValueError("unknown test command; available: " + ", ".join(self.command_specs))
+            summary = {"kind": "run_tests", "name": args["name"], "argv": spec["argv"]}
+            for key in ("cwd", "timeout"):
+                if spec.get(key):
+                    summary[key] = spec[key]
+            shown = {**summary, "argv": [self.scrub(a) for a in spec["argv"]]}
+            return shown, _digest({**summary, "env_keys": sorted(spec["env"])})
         raise ValueError("not an effect tool")
 
     def call(self, name, args):
@@ -77,21 +109,55 @@ class ToolBox:
         fn = getattr(self, "t_" + name, None)
         if fn is None or name not in {s["name"] for s in SCHEMAS}:
             raise ValueError("unknown tool")
-        result = fn(**args)
+        try:
+            result = fn(**args)
+        except ValueError as exc:
+            raise type(exc)(str(exc) + self._path_hint(args)) from None
         if name in {"find_files", "search_text"} and isinstance(result, dict):
             result["scan_truncated"] = bool(getattr(self.ws, "scan_truncated", False))  # the walk hit its file limit
         return result
+
+    def _path_hint(self, args):
+        """For a path that does not exist, suggest similar names: typos and wrong casing are the commonest tool failure."""
+        path = args.get("path")
+        if not isinstance(path, str) or not path or len(path) > 400:
+            return ""
+        try:
+            target = self.ws.resolve(path)
+            if target.exists():
+                return ""
+            parent = target.parent
+            while not parent.exists() and parent != self.ws.root:
+                parent = parent.parent
+            names = [p.name for p in parent.iterdir() if not p.is_symlink()][:2000]
+            close = difflib.get_close_matches(target.name, names, n=3, cutoff=0.5) or [n for n in names if n.lower() == target.name.lower()]
+            rel = parent.relative_to(self.ws.root).as_posix()
+            where = "" if rel == "." else rel + "/"
+            return f"; '{path}' does not exist" + (f". Similar: {', '.join(where + c for c in close)}" if close else f". Nearest existing folder: {rel}")
+        except (ValueError, OSError):
+            return ""
 
     # --- read-only ---
     def t_list_dir(self, path=".", depth=1):
         return {"entries": self.ws.list_directory(path, depth)}
 
-    def t_read_file(self, path, start_line=1, end_line=None, encoding=None):
+    def t_read_file(self, path, start_line=1, end_line=None, encoding=None, column=None, width=None):
         if type(start_line) is not int or start_line < 1:
             raise ValueError("invalid start_line")
         if end_line is None:
             end_line = start_line + 199
+        if column is not None:   # slice one very long line (minified code, data dumps)
+            if type(column) is not int or column < 1 or (width is not None and (type(width) is not int or not 1 <= width <= 32000)):
+                raise ValueError("invalid column/width")
+            result = self.ws.read_file(path, start_line, start_line, encoding=encoding)
+            line = result["lines"][0] if result["lines"] else ""
+            result.update({"lines": [line[column - 1:column - 1 + (width or MAX_LINE_CHARS)]], "line_length": len(line), "column": column})
+            return result
         result = self.ws.read_file(path, start_line, min(end_line, start_line + 199), encoding=encoding)
+        long_lines = [{"line": start_line + i, "length": len(l)} for i, l in enumerate(result["lines"]) if len(l) > MAX_LINE_CHARS]
+        if long_lines:
+            result["lines"] = [l if len(l) <= MAX_LINE_CHARS else l[:MAX_LINE_CHARS] + " ...[line truncated: read it with column/width]" for l in result["lines"]]
+            result["truncated_lines"] = long_lines
         if sum(len(line) for line in result["lines"]) > 32000:
             raise ValueError("requested lines exceed 32000 characters; request a smaller range")
         return result
@@ -110,14 +176,35 @@ class ToolBox:
                 hits.append(rel)
         return {"files": hits, "truncated": truncated}
 
-    def t_search_text(self, query, path=".", glob=None, start_line=1, encoding=None):
+    def _matcher(self, query, terms, whole_word):
+        """line -> column (1-based) of the first hit or 0. Built from escaped text only: no user regex, no backtracking blowups."""
+        words = [query] + ([t for t in terms] if terms is not None else [])
+        if len(words) > MAX_TERMS or not all(isinstance(w, str) and 0 < len(w) <= 200 for w in words):
+            raise ValueError(f"query and terms must be non-empty strings of at most 200 characters, at most {MAX_TERMS} in total")
+        if whole_word:
+            patterns = [word_pattern(w) for w in words]
+            def find(line):
+                hits = [m.start() + 1 for m in (p.search(line) for p in patterns) if m]
+                return min(hits) if hits else 0
+        else:
+            lowered = [w.lower() for w in words]
+            def find(line):
+                low = line.lower()
+                hits = [low.find(w) + 1 for w in lowered if w in low]
+                return min(hits) if hits else 0
+        return find
+
+    def t_search_text(self, query, path=".", glob=None, start_line=1, encoding=None, whole_word=False, terms=None):
         if not isinstance(query, str) or not query or len(query) > 200:
             raise ValueError("invalid query")
         if type(start_line) is not int or start_line < 1:
             raise ValueError("invalid start_line")
+        if terms is not None and not isinstance(terms, list):
+            raise ValueError("terms must be a list of alternative strings")
         if encoding is not None:
             normalize(encoding)
-        needle, matches, truncated, extra = query.lower(), [], False, {}
+        find = self._matcher(query, terms, bool(whole_word))
+        matches, truncated, extra = [], False, {}
         skipped_large = 0
         skipped_encoding = 0
         for f in self._files(path):
@@ -141,7 +228,8 @@ class ToolBox:
                 continue
             in_file = 0
             for n, line in enumerate(text.splitlines(), 1):
-                if n < start_line or needle not in line.lower():
+                column = find(line) if n >= start_line else 0
+                if not column:
                     continue
                 in_file += 1
                 if in_file > MAX_PER_FILE:  # a noisy file must not crowd out other files
@@ -149,7 +237,7 @@ class ToolBox:
                 elif len(matches) >= MAX_MATCHES:
                     return {"matches": matches, "truncated": True, "more_in_file": extra, "skipped_large_files": skipped_large, "skipped_encoding_files": skipped_encoding}
                 else:
-                    matches.append({"path": rel, "line": n, "text": line.strip()[:200]})
+                    matches.append({"path": rel, "line": n, "column": column, "text": _excerpt(line, column)})
         return {"matches": matches, "truncated": truncated, "more_in_file": extra, "skipped_large_files": skipped_large, "skipped_encoding_files": skipped_encoding}
 
     # --- proposals (no writes) ---
@@ -166,20 +254,22 @@ class ToolBox:
         return {"proposal_id": pid, "diff": diff}
 
     def t_propose_edit(self, path, old, new, encoding=None):
+        if not isinstance(old, str) or not isinstance(new, str):
+            raise ValueError("old and new must be strings")
         info = self.flow.inspect(path)
         text, codec, prefix = decode_source(self.ws.resolve(path).read_bytes(), encoding)
-        if CRLF in text and CR not in old:  # CRLF file: the model writes LF
-            old, new = old.replace(LF, CRLF), new.replace(LF, CRLF)
         if len(old) > 20000 or len(new) > 20000:
             raise ValueError("invalid edit size; split into edits of at most 20000 characters")
-        if not old or text.count(old) != 1:
-            raise ValueError("old text must occur exactly once")
-        after = text.replace(old, new, 1)
+        start, end = locate(text, old)   # tolerant to line endings; otherwise fails with the actual text and line numbers
+        actual, replacement = text[start:end], adapt_eol(text, start, end, new)
+        after = text[:start] + replacement + text[end:]
         if len(encode_source(after, codec, prefix)) > MAX_FILE_BYTES:
             raise ValueError("updated file too large")
-        return self._store(path, "edit", old, new, text, after, info["sha256"], encoding=codec)
+        return self._store(path, "edit", actual, replacement, text, after, info["sha256"], encoding=codec)
 
     def t_propose_new_file(self, path, content, encoding="utf-8"):
+        if not isinstance(content, str) or not isinstance(encoding, str):
+            raise ValueError("content and encoding must be strings")
         target = self.files.resolve(path)
         if target.exists() or target.is_symlink():
             raise ValueError("file already exists")
@@ -250,18 +340,24 @@ class ToolBox:
         if p is None:
             raise ValueError("unknown or already used proposal")
         try:
+            if p["kind"] in self._appliers:
+                return self._appliers[p["kind"]](p)
             if p["kind"] == "git_commit":
                 return self._git_tools().apply(p["git_plan"])
             if p["kind"] == "file_operation":
                 return self.files.apply(p["operation_plan"])
             if p["kind"] == "edit":
+                before = self.ws.resolve(p["path"]).read_bytes()
                 r = self.flow.replace_text(p["path"], p["sha"], p["old"], p["new"], encoding=p.get("encoding"))
-                return {"status": "APPLIED", "path": p["path"], "sha256": r["sha256"]}
+                return {"status": "APPLIED", "path": p["path"], "sha256": r["sha256"],
+                        "applied_id": self._remember([{"op": "write", "path": p["path"], "before": before, "after_sha": r["sha256"]}])}
             target = self.files.resolve(p["path"])
             target.parent.mkdir(parents=True, exist_ok=True)
             self.files.resolve(p["path"])
-            self.files._write_exclusive(target, encode_new_source(p["new"], p.get("encoding", "utf-8")))
-            return {"status": "APPLIED", "path": p["path"]}
+            data = encode_new_source(p["new"], p.get("encoding", "utf-8"))
+            self.files._write_exclusive(target, data)
+            return {"status": "APPLIED", "path": p["path"],
+                    "applied_id": self._remember([{"op": "create", "path": p["path"], "before": None, "after_sha": hashlib.sha256(data).hexdigest()}])}
         except Conflict as exc:
             return {"status": "CONFLICT", "detail": str(exc)}
         except FileExistsError:

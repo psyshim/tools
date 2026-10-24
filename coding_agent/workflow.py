@@ -58,23 +58,44 @@ class Workflow:
             updated = encode_source(content.replace(original, replacement, 1), codec, prefix)
             if len(updated) > self.max_file_bytes:
                 raise ValueError("updated file too large")
-            mode = path.stat().st_mode
-            fd, tmp = tempfile.mkstemp(prefix=".agent-", dir=str(path.parent))
-            try:
-                with os.fdopen(fd, "wb") as handle:
-                    handle.write(updated)
-                    handle.flush()
-                    os.fsync(handle.fileno())
-                os.chmod(tmp, mode)
-                # Cooperative in-process only: external editor races remain possible.
-                if path.read_bytes() != data:
-                    raise Conflict("file changed during edit")
-                os.replace(tmp, path)
-                tmp = None
-            finally:
-                if tmp is not None:
-                    os.unlink(tmp)
+            self._swap(path, data, updated)
             return {"path": relative, "sha256": hashlib.sha256(updated).hexdigest(), "operation_id": str(uuid.uuid4())}
+
+    @staticmethod
+    def _swap(path, data, updated):
+        """Write `updated` next to `path` and atomically replace it, unless the file changed since `data` was read."""
+        mode = path.stat().st_mode
+        fd, tmp = tempfile.mkstemp(prefix=".agent-", dir=str(path.parent))
+        try:
+            with os.fdopen(fd, "wb") as handle:
+                handle.write(updated)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.chmod(tmp, mode)
+            # Cooperative in-process only: external editor races remain possible.
+            if path.read_bytes() != data:
+                raise Conflict("file changed during edit")
+            os.replace(tmp, path)
+            tmp = None
+        finally:
+            if tmp is not None:
+                os.unlink(tmp)
+
+    def replace_bytes(self, relative, expected_sha256, updated):
+        """Whole-file compare-and-swap: replace the file with `updated` only if it still hashes to `expected_sha256`.
+        The building block for edits computed elsewhere (line ranges, notebook cells, batches, undo)."""
+        if not isinstance(expected_sha256, str) or not isinstance(updated, (bytes, bytearray)):
+            raise ValueError("invalid arguments")
+        updated = bytes(updated)
+        with _LOCK:
+            path = self._file(relative)
+            data = path.read_bytes()
+            if len(data) > self.max_file_bytes or len(updated) > self.max_file_bytes:
+                raise ValueError("file too large")
+            if hashlib.sha256(data).hexdigest() != expected_sha256:
+                raise Conflict("stale SHA-256")
+            self._swap(path, data, updated)
+            return {"path": relative, "sha256": hashlib.sha256(updated).hexdigest(), "operation_id": str(uuid.uuid4()), "before": data}
 
     def test_python_syntax(self, relative):
         target = self._file(relative)

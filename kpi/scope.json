@@ -579,6 +579,95 @@
     "tests.test_code_attach_adversarial.ProcessAbuse.test_hostile_test_output_and_behaviour_are_contained"
    ],
    "integration": null
+  },
+  {
+   "id": "R28",
+   "title": "Weak-spot coverage: teaching edit errors, navigation, per-command settings, parsed results, line/batch/notebook edits, undo, project recon",
+   "doc": [
+    "docs/AUDIT_2026-10-24.md",
+    "Weak-spot round"
+   ],
+   "code": [
+    [
+     "code_attach/matching.py",
+     "def locate"
+    ],
+    [
+     "code_attach/tools_edit.py",
+     "def t_propose_edits"
+    ],
+    [
+     "code_attach/tools_nav.py",
+     "def t_find_symbol"
+    ],
+    [
+     "code_attach/detect.py",
+     "def suggest_test_commands"
+    ],
+    [
+     "code_attach/testparse.py",
+     "def parse"
+    ]
+   ],
+   "tests": [
+    "tests.test_code_attach_coverage.BatchEdits.test_external_change_before_apply_conflicts_and_changes_nothing",
+    "tests.test_code_attach_coverage.BatchEdits.test_failure_midway_rolls_back_every_file",
+    "tests.test_code_attach_coverage.BatchEdits.test_limits_and_shapes",
+    "tests.test_code_attach_coverage.BatchEdits.test_one_bad_edit_rejects_the_whole_proposal_with_its_position",
+    "tests.test_code_attach_coverage.BatchEdits.test_rename_across_files_is_one_approval_and_one_result",
+    "tests.test_code_attach_coverage.BatchEdits.test_rollback_failure_is_reported_as_needing_reconciliation",
+    "tests.test_code_attach_coverage.Commands.test_compiler_style_output_yields_diagnostics",
+    "tests.test_code_attach_coverage.Commands.test_cwd_that_is_not_a_directory_reports_unknown",
+    "tests.test_code_attach_coverage.Commands.test_invalid_command_tables_are_rejected_up_front",
+    "tests.test_code_attach_coverage.Commands.test_model_sees_the_available_command_names_and_descriptions",
+    "tests.test_code_attach_coverage.Commands.test_per_command_cwd_timeout_and_env",
+    "tests.test_code_attach_coverage.Commands.test_results_are_parsed_into_failures_with_file_and_line",
+    "tests.test_code_attach_coverage.EditDiagnostics.test_duplicate_failure_lists_every_line",
+    "tests.test_code_attach_coverage.EditDiagnostics.test_lf_old_text_matches_crlf_and_mixed_files_and_keeps_endings_consistent",
+    "tests.test_code_attach_coverage.EditDiagnostics.test_missing_path_suggests_similar_names",
+    "tests.test_code_attach_coverage.EditDiagnostics.test_near_miss_points_at_the_closest_text",
+    "tests.test_code_attach_coverage.EditDiagnostics.test_nothing_similar_says_so_plainly",
+    "tests.test_code_attach_coverage.EditDiagnostics.test_single_line_replaced_by_several_lines_in_a_crlf_file_adds_no_bare_lf",
+    "tests.test_code_attach_coverage.EditDiagnostics.test_tab_vs_space_failure_shows_the_real_text_and_line",
+    "tests.test_code_attach_coverage.EndToEnd.test_model_navigates_edits_atomically_runs_tests_and_undoes",
+    "tests.test_code_attach_coverage.LineRangeEdits.test_crlf_and_duplicates_elsewhere_are_handled",
+    "tests.test_code_attach_coverage.LineRangeEdits.test_expectation_mismatch_shows_the_real_lines_and_out_of_range_is_clear",
+    "tests.test_code_attach_coverage.LineRangeEdits.test_replace_lines_happy_path_delete_and_insertion_growth",
+    "tests.test_code_attach_coverage.LineRangeEdits.test_stale_file_conflicts_instead_of_overwriting",
+    "tests.test_code_attach_coverage.Navigation.test_find_symbol_separates_definitions_from_references_across_languages",
+    "tests.test_code_attach_coverage.Navigation.test_outline_file_tool",
+    "tests.test_code_attach_coverage.Navigation.test_project_overview_includes_what_the_host_enabled",
+    "tests.test_code_attach_coverage.Navigation.test_qualified_names_and_kind_filter",
+    "tests.test_code_attach_coverage.Navigation.test_search_whole_word_terms_and_column",
+    "tests.test_code_attach_coverage.Navigation.test_symbol_search_skips_noise_directories",
+    "tests.test_code_attach_coverage.Navigation.test_very_long_lines_are_excerpted_and_readable_by_column",
+    "tests.test_code_attach_coverage.Notebooks.test_bad_input_is_refused_cleanly",
+    "tests.test_code_attach_coverage.Notebooks.test_insert_and_delete",
+    "tests.test_code_attach_coverage.Notebooks.test_read_notebook_lists_cells",
+    "tests.test_code_attach_coverage.Notebooks.test_replace_clears_stale_outputs_and_keeps_the_file_layout",
+    "tests.test_code_attach_coverage.Undo.test_undo_is_refused_after_someone_else_changed_the_file",
+    "tests.test_code_attach_coverage.Undo.test_undo_of_a_created_file_and_of_a_batch",
+    "tests.test_code_attach_coverage.Undo.test_undo_restores_exact_bytes_and_can_itself_be_undone",
+    "tests.test_code_attach_coverage.Undo.test_unknown_ids_and_history_bounds",
+    "tests.test_code_attach_parsing.Detection.test_go_rust_java_make_php_and_empty",
+    "tests.test_code_attach_parsing.Detection.test_hostile_manifests_do_not_break_detection",
+    "tests.test_code_attach_parsing.Detection.test_python_node_and_dotnet_in_one_repo",
+    "tests.test_code_attach_parsing.Detection.test_python_without_pytest_uses_unittest_and_venv_interpreter",
+    "tests.test_code_attach_parsing.Detection.test_suggestions_are_never_executed_by_detection",
+    "tests.test_code_attach_parsing.Outlines.test_broken_python_still_yields_a_heuristic_outline",
+    "tests.test_code_attach_parsing.Outlines.test_language_detection",
+    "tests.test_code_attach_parsing.Outlines.test_other_languages",
+    "tests.test_code_attach_parsing.Outlines.test_outline_is_bounded_and_survives_hostile_input",
+    "tests.test_code_attach_parsing.Outlines.test_python_uses_the_real_parser_with_qualified_names",
+    "tests.test_code_attach_parsing.Outlines.test_word_pattern_is_whole_word_and_regex_safe",
+    "tests.test_code_attach_parsing.ParsingOutput.test_diagnostics_from_compilers_and_linters",
+    "tests.test_code_attach_parsing.ParsingOutput.test_other_runners",
+    "tests.test_code_attach_parsing.ParsingOutput.test_parser_never_raises_and_stays_bounded",
+    "tests.test_code_attach_parsing.ParsingOutput.test_pytest_variants",
+    "tests.test_code_attach_parsing.ParsingOutput.test_real_unittest_failure_output",
+    "tests.test_code_attach_parsing.ParsingOutput.test_unittest_ok"
+   ],
+   "integration": null
   }
  ],
  "deferred": [

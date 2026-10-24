@@ -2,6 +2,7 @@
 import hashlib
 import threading
 from .session import LogUnavailable, Task, TERMINAL
+from .testrun import normalize_commands
 from .tools import ToolBox
 
 def _ref(value):
@@ -25,7 +26,7 @@ class Engine:
     a cap on ACTIVE tasks and bounded retention of finished ones. Knows nothing about HTTP or authentication."""
     def __init__(self, complete, test_commands=None, max_tasks=64, test_timeout=180, event_sink=None, test_env=None, keep_finished=256, recycle_dir=None):
         self._complete = complete
-        self._tests = dict(test_commands or {})
+        self._tests = normalize_commands(test_commands)
         self._max = max_tasks
         self._timeout = test_timeout
         self._test_env = test_env
