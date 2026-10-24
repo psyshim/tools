@@ -17,7 +17,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULES = ["tests.test_protocol_contract", "tests.test_protocol_conformance",     # the contract, mock + real service, in-process and as separate processes
-           "tests.test_host_client", "tests.test_sample_host",                  # the host side: client behaviour and a complete adapter
+           "tests.test_host_client", "tests.test_sample_host", "tests.test_host_wrapper",                  # the host side: client behaviour and a complete adapter
            "tests.test_device_agent", "tests.test_device_effect_uncertainty",   # the device: grants, journal, uncertain outcomes
            "tests.test_service_device_processes", "tests.test_service_recovery",  # isolation and restart/kill recovery across processes
            "tests.test_experimental_mutation_stack", "tests.test_effect_semantics", "tests.test_write_guard"]  # effects, crash points, write guard

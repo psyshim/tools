@@ -24,7 +24,7 @@ GATES = {
     "git_selected_commit_and_interference": ("test_git_ops.", "test_git_adversarial.", "test_acceptance_flows.AcceptanceFlowTests.test_git"),
     "process_environment_and_budgets": ("test_code_attach_audit.", "test_code_attach_audit2.", "test_bounded_process_output.", "test_execution_owner.", "test_test_evidence_barriers."),
     "privacy": ("test_code_attach_privacy.",),
-    "durable_logs_and_unknown_outcomes": ("test_local_app.", "test_journal.", "test_journaled_edit.", "test_adversarial_recovery.", "test_durable_store_faults.", "test_manager_interruption.", "test_service_recovery.", "test_device_effect_uncertainty."),
+    "durable_logs_and_unknown_outcomes": ("test_local_app.", "test_journal.", "test_journaled_edit.", "test_adversarial_recovery.", "test_durable_store_faults.", "test_manager_interruption.", "test_service_recovery.", "test_device_effect_uncertainty.", "test_corrupt_state_records.", "test_adversarial_report."),
     "architecture_and_protocol_errors": ("test_architecture_boundaries.", "test_code_attach_boundaries.", "test_fault_service.", "test_source_evidence.", "test_python_compatibility.", "test_protocol_byte_budgets."),
 }
 
@@ -46,6 +46,9 @@ class EvidenceResult(unittest.TextTestResult):
         self._started = {}
         self._status = {}
 
+    def wasSuccessful(self):
+        return super().wasSuccessful() and all(row["status"] in {"PASS", "SKIP"} for row in self.records)
+
     def startTest(self, test):
         self._started[test.id()] = time.monotonic()
         super().startTest(test)
@@ -61,10 +64,29 @@ class EvidenceResult(unittest.TextTestResult):
     def addError(self, test, err):
         self._status[test.id()] = ("ERROR", type(err[1]).__name__)
         super().addError(test, err)
+        self._outside_test(test, "ERROR", type(err[1]).__name__)
 
     def addSkip(self, test, reason):
         self._status[test.id()] = ("SKIP", reason)
         super().addSkip(test, reason)
+        self._outside_test(test, "SKIP", reason)
+
+    def _outside_test(self, test, status, detail):
+        if test.id() not in self._started:
+            identifier = test.id()
+            target = identifier.partition(" (")[2].removesuffix(")") or identifier
+            self.records.append({"test": identifier, "fixture_target": target, "scope": "fixture",
+                                 "status": status, "seconds": 0, "detail": str(detail)})
+
+    def addExpectedFailure(self, test, err):
+        # A known failing requirement is not acceptance evidence merely because
+        # unittest's decorator changes its exit-code interpretation.
+        self._status[test.id()] = ("FAIL", "expected_failure: " + type(err[1]).__name__)
+        super().addExpectedFailure(test, err)
+
+    def addUnexpectedSuccess(self, test):
+        self._status[test.id()] = ("FAIL", "unexpected_success: remove the stale marker and reverify")
+        super().addUnexpectedSuccess(test)
 
     def addSubTest(self, test, subtest, err):
         if err is not None:
@@ -94,12 +116,12 @@ def main():
     changed = sorted(path for path in before.keys() | after.keys() if before.get(path) != after.get(path))
     gates = []
     for name, prefixes in GATES.items():
-        records = [r for r in result.records if r["test"].startswith(prefixes)]
+        records = [r for r in result.records if r.get("fixture_target", r["test"]).startswith(prefixes)]
         counts = {s: sum(r["status"] == s for r in records) for s in ("PASS", "FAIL", "ERROR", "SKIP", "UNMEASURED")}
         status = "NOT_COVERED" if not records else "FAIL" if counts["FAIL"] or counts["ERROR"] or counts["UNMEASURED"] else "PARTIAL" if counts["SKIP"] else "PASS"
         gates.append({"gate": name, "status": status, **counts})
     covered = all(g["status"] not in {"FAIL", "NOT_COVERED"} for g in gates)
-    success = result.wasSuccessful() and covered and not changed
+    success = result.wasSuccessful() and covered and not changed and all(r["status"] in {"PASS", "SKIP"} for r in result.records)
     report = {"schema": 1, "timestamp": datetime.now(timezone.utc).isoformat(),
               "environment": {"python": platform.python_version(), "os": platform.system()},
               "evidence": "offline tool/runtime acceptance; actual filesystem, subprocess and Git assertions; not model reasoning or prompt-injection evaluation",

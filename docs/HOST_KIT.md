@@ -4,23 +4,23 @@ This is the page to hand to the team that owns the chat backend. It replaces `HO
 
 ## What you install and what you write
 
-You install one pure-Python wheel, `code-host-kit` (`host_client` + `protocol`, standard library only), and you write one thin adapter (about 60 lines: `examples/sample_host/adapter.py`). You do **not** install or import any agent, tool, file, Git, subprocess, model or web-framework code. The wheel is reproducible and carries a manifest with the source revision and per-file hashes.
+You install one pure-Python wheel, `code-host-kit` (`host_client` + `protocol`, standard library only), and you write one `HostEnvironment` subclass (one required method: the workspace ACL) and mount five routes. The full specification, route table and acceptance tool are in `docs/HOST_WRAPPER_SPEC.md` (Japanese); a complete example is `examples/sample_host/app.py`. You do **not** install or import any agent, tool, file, Git, subprocess, model or web-framework code. The wheel is reproducible and carries a manifest with the source revision and per-file hashes.
 
 ```bash
 python -m hostkit_build.build_host_kit --out dist/host_kit
-pip install dist/host_kit/code_host_kit-1.0.0-py3-none-any.whl
+pip install dist/host_kit/code_host_kit-1.1.0-py3-none-any.whl
 pip uninstall code-host-kit     # removal leaves ordinary chat, login and uploads untouched
 ```
 
-The adapter supplies three callbacks the host already has:
+The host-specific parts are:
 
-| Callback | Meaning |
+| Piece | Meaning |
 |---|---|
-| `identity(request)` | the verified user id (raise to refuse) |
-| `can_access_workspace(user, workspace_id)` | **your** ACL decision. The service grants workspaces to the host, not to its users. |
-| `deliver(user, conversation_id, event)` | render an event in your chat UI. Use `SafeDisplayEvent.html_text`, never raw fields. |
+| login check | the host's existing session handling produces a verified `user` and calls `endpoints.dispatch(...)` |
+| `HostEnvironment.can_access_workspace(user, workspace_id)` | **your** ACL decision, required. The service grants workspaces to the host, not to its users. |
+| `HostEnvironment.coding_enabled` / `audit` | optional feature flag and ID-only audit hook |
 
-and one object: `AgentGateway(service_url, host_credential)` (`availability`, `start_coding`, `poll_coding`/`observe_coding`, `cancel_coding`, `submit_decision`).
+and one object: `CodingEndpoints(AgentGateway(service_url, host_credential), environment)` with `ROUTES` and `dispatch`. When finished, run `python -m host_client.acceptance ...` against the running backend.
 
 ## Rules that keep the host powerless
 

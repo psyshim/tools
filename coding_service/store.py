@@ -13,7 +13,8 @@ import uuid
 from contextlib import contextmanager
 from pathlib import Path
 
-from protocol import PROTOCOL_VERSION, TERMINAL_STATES
+from protocol import PROTOCOL_VERSION, TERMINAL_STATES, ProtocolError, validate_event
+from protocol.json_boundary import loads_object
 
 from .errors import KeyConflict, LogUnavailable
 
@@ -24,6 +25,38 @@ SCHEMA_COLUMNS = {
     "events": {"task_id", "seq", "type", "data"},
     "model_usage": {"task_id", "call_id", "event_seq", "data", "created"},
 }
+
+
+def _record_object(raw):
+    try:
+        return loads_object(raw, max_bytes=4 * 1024 * 1024)
+    except (ValueError, TypeError, RecursionError, UnicodeError):
+        raise LogUnavailable("durable JSON record is invalid") from None
+
+
+def _event_object(kind, raw):
+    data = _record_object(raw)
+    try:
+        validate_event({"protocol": PROTOCOL_VERSION, "task_id": "stored", "event_id": "1", "type": kind, "data": data})
+    except ProtocolError:
+        raise LogUnavailable("durable event record violates the protocol") from None
+    return data
+
+
+def _usage_object(raw):
+    from .usage import TOKEN_FIELDS, normalize_usage
+    data = _record_object(raw)
+    if (data.get("code") not in {"model_call_started", "model_usage"}
+            or not isinstance(data.get("model_call_id"), str)
+            or not data["model_call_id"]
+            or not isinstance(data.get("provider"), str)
+            or not isinstance(data.get("model"), str)
+            or type(data.get("available")) is not bool):
+        raise LogUnavailable("durable usage record is invalid")
+    normalized = normalize_usage(data)
+    if any(key not in data or data[key] != normalized[key] for key in (*TOKEN_FIELDS, "available", "provider", "model")):
+        raise LogUnavailable("durable usage totals are inconsistent")
+    return data
 
 
 def _check_schema(connection, *, legacy=False):
@@ -112,7 +145,7 @@ class TaskStore:
             call_id = data["model_call_id"]
             previous = db.execute("SELECT event_seq,data FROM model_usage WHERE task_id=? AND call_id=?", (task_id, call_id)).fetchone()
             if previous:
-                previous_data = json.loads(previous[1])
+                previous_data = _record_object(previous[1])
                 if previous[1] == payload or (previous_data.get("code") == "model_usage" and data["code"] == "model_call_started"):
                     return previous[0]
                 if previous_data.get("code") == "model_call_started" and data["code"] == "model_usage":
@@ -175,20 +208,26 @@ class TaskStore:
                 last = self._db.execute("SELECT COALESCE(MAX(seq), 0) FROM events WHERE task_id = ?", (task_id,)).fetchone()[0]
             except sqlite3.Error as exc:
                 raise LogUnavailable(type(exc).__name__) from None
-        events = [{"protocol": PROTOCOL_VERSION, "task_id": task_id, "event_id": str(seq), "type": kind, "data": json.loads(data)} for seq, kind, data in rows]
+        events = [{"protocol": PROTOCOL_VERSION, "task_id": task_id, "event_id": str(seq), "type": kind, "data": _event_object(kind, data)} for seq, kind, data in rows]
         # A long log is served in pages of 2000; next_cursor is always the id of the task's last event, so a client that has not
         # reached it simply asks again.
         return {"events": events, "state": state, "next_cursor": last}
 
     def all_events(self, task_id):
         with self._lock:
-            rows = self._db.execute("SELECT seq, type, data FROM events WHERE task_id = ? ORDER BY seq", (task_id,)).fetchall()
-        return [(seq, kind, json.loads(data)) for seq, kind, data in rows]
+            try:
+                rows = self._db.execute("SELECT seq, type, data FROM events WHERE task_id = ? ORDER BY seq", (task_id,)).fetchall()
+            except sqlite3.Error as exc:
+                raise LogUnavailable(type(exc).__name__) from None
+        return [(seq, kind, _event_object(kind, data)) for seq, kind, data in rows]
 
     def incomplete(self):
         with self._lock:
             marks = ",".join("?" * len(TERMINAL_STATES))
-            rows = self._db.execute(f"SELECT id, principal, workspace, state, instruction FROM tasks WHERE state NOT IN ({marks})", tuple(TERMINAL_STATES)).fetchall()
+            try:
+                rows = self._db.execute(f"SELECT id, principal, workspace, state, instruction FROM tasks WHERE state NOT IN ({marks})", tuple(TERMINAL_STATES)).fetchall()
+            except sqlite3.Error as exc:
+                raise LogUnavailable(type(exc).__name__) from None
         return [{"id": r[0], "principal": r[1], "workspace": r[2], "state": r[3], "instruction": r[4]} for r in rows]
 
     def usage_summary(self, *, task_id=None, principal=None, workspace=None, since=None, until=None):
@@ -206,7 +245,7 @@ class TaskStore:
             rows = self._db.execute(sql, params).fetchall()
         groups, tasks = {}, set()
         for tid, raw in rows:
-            data = json.loads(raw)
+            data = _usage_object(raw)
             key = (data["provider"], data["model"])
             group = groups.setdefault(key, {"provider": key[0], "model": key[1], "calls": 0, "unavailable_calls": 0, "unfinished_calls": 0,
                                            **{"known_" + field: 0 for field in TOKEN_FIELDS}})
@@ -240,12 +279,14 @@ class TaskStore:
                 for tid, seq, kind, raw in rows:
                     if include_content and tid != previous_task:
                         task = connection.execute("SELECT principal,workspace,instruction,state,created FROM tasks WHERE id=?", (tid,)).fetchone()
+                        if task is None:
+                            raise LogUnavailable("orphaned event in the durable store")
                         yield {"task_id": tid, "type": "task_metadata", "data": {
                             "principal": task[0], "workspace": task[1], "instruction": task[2], "state": task[3], "created": task[4]}}
                         previous_task = tid
                     row = {"task_id": tid, "event_id": seq, "type": kind}
                     if include_content:
-                        row["data"] = json.loads(raw)
+                        row["data"] = _record_object(raw)
                     yield row
         finally:
             connection.close()

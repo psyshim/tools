@@ -16,6 +16,22 @@ from coding_service.usage import normalize_usage
 
 
 class StateBackupTests(unittest.TestCase):
+    def test_hashing_a_large_snapshot_honors_the_same_deadline(self):
+        from coding_service.backup import _receipt
+        source = self.root / "large.bin"
+        source.write_bytes(b"x" * 131072)
+        with patch("coding_service.backup.time.monotonic", side_effect=[0, 2]), self.assertRaises(TimeoutError):
+            _receipt(source, deadline=1)
+
+    def test_cli_explains_checksum_refusal_without_publishing_a_destination(self):
+        backup, _ = self.snapshot()
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            result = main(["--db", str(self.root / "new.db"), "restore", "--input", str(backup), "--sha256", "0" * 64])
+        self.assertEqual(result, 1)
+        self.assertIn("SHA-256 mismatch", stderr.getvalue())
+        self.assertFalse((self.root / "new.db").exists())
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
