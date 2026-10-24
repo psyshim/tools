@@ -2,6 +2,12 @@
 import hashlib
 from pathlib import Path
 
+# This denylist is defense-in-depth, not a substitute for OS sandboxing.
+_PRIVATE_NAMES = {".git", ".env", ".npmrc", ".pypirc", ".netrc", ".ssh", ".aws", ".config", "id_rsa", "id_ed25519", "credentials", "credentials.json"}
+
+def _allowed(path):
+    return not any(part.lower() in _PRIVATE_NAMES or part.lower().startswith(".env.") or part.lower().endswith((".pem", ".key", ".p12", ".pfx")) for part in path.parts)
+
 class Workspace:
     def __init__(self, root):
         self.root = Path(root).resolve(strict=True)
@@ -15,6 +21,8 @@ class Workspace:
         candidate = (self.root / path).resolve(strict=False)
         if not candidate.is_relative_to(self.root):
             raise ValueError("outside workspace")
+        if not _allowed(candidate.relative_to(self.root)):
+            raise ValueError("restricted path")
         return candidate
 
     def list_directory(self, path=".", depth=1):
@@ -26,7 +34,7 @@ class Workspace:
         results = []
         def walk(directory, remaining):
             for child in sorted(directory.iterdir()):
-                if child.is_symlink():
+                if child.is_symlink() or not _allowed(child.relative_to(self.root)):
                     continue
                 results.append(child.relative_to(self.root).as_posix() + ("/" if child.is_dir() else ""))
                 if len(results) > 500:
