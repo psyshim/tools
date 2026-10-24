@@ -10,6 +10,9 @@ from urllib.parse import urlsplit, parse_qs
 class ScenarioStore:
     def __init__(self):
         self.lock = threading.RLock()
+        self.tasks = {}
+        self.keys = {}
+        self.calls = 0
         self.configure("normal")
 
     def configure(self, scenario):
@@ -17,8 +20,11 @@ class ScenarioStore:
             raise ValueError("unknown scenario")
         with self.lock:
             self.scenario = scenario
-            self.tasks = {}
-            self.keys = {}
+
+    def reset(self):
+        with self.lock:
+            self.tasks.clear()
+            self.keys.clear()
             self.calls = 0
 
 def handler_factory(token, control_token, store=None):
@@ -51,8 +57,12 @@ def handler_factory(token, control_token, store=None):
                 if not self.auth(control_token):
                     return self.send(401, {"error":"unauthorized"})
                 try:
-                    scenario = self.body()["scenario"]
+                    request = self.body()
+                    scenario = request["scenario"]
+                    self.body_reset_requested = request.get("reset", False) is True
                     state.configure(scenario)
+                    if self.body_reset_requested:
+                        state.reset()
                 except (KeyError, TypeError, ValueError):
                     return self.send(400, {"error":"invalid_scenario"})
                 return self.send(200, {"scenario":scenario})
