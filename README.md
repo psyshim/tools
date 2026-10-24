@@ -30,6 +30,8 @@ The server binds to `127.0.0.1:8767` (change with `--port`). Its printed URL con
 
 Production path: the host installs only the powerless `code-host-kit` wheel and writes a thin adapter ([docs/HOST_KIT.md](docs/HOST_KIT.md)); the Coding Service and the Device Agent run separately ([docs/OPERATOR_GUIDE.md](docs/OPERATOR_GUIDE.md)).
 
+Delivery rules (what is held, how, and what is not covered): [docs/DELIVERY_POLICY.md](docs/DELIVERY_POLICY.md); the gate is `python -m hostkit_build.release_gate --full`.
+
 The in-process `make_router(...)` described in [ATTACH_V0.md](docs/ATTACH_V0.md) is a local prototype only and refuses to mount without `prototype=True`.
 
 ## Validation

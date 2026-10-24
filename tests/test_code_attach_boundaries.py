@@ -29,7 +29,7 @@ AGENT_RULES = {
     "testparse.py": (AGENT_FORBIDDEN | {"subprocess", "coding_agent"}, set()),
     "schemas.py": (AGENT_FORBIDDEN | {"subprocess", "coding_agent"}, set()),
     "globs.py": (AGENT_FORBIDDEN | {"subprocess", "coding_agent"}, set()),
-    "privacy.py": (AGENT_FORBIDDEN | {"subprocess", "coding_agent"}, set()),
+    "privacy.py": (AGENT_FORBIDDEN | {"subprocess"}, set()),   # may use exactly one coding_agent module: see test_privacy_depends_on_the_path_spelling_leaf_only
     "testrun.py": (AGENT_FORBIDDEN | {"coding_agent"}, {"testparse"}),  # the only module that starts processes
     "activity.py": (AGENT_FORBIDDEN | {"subprocess"}, set()),
 }
@@ -68,6 +68,16 @@ class BoundaryTests(unittest.TestCase):
                     self.assertNotIn(top, forbidden | {".."})
                     if top == "":
                         self.assertIn(rel, allowed_rel)
+
+    def test_privacy_depends_on_the_path_spelling_leaf_only(self):
+        import ast
+        tree = ast.parse((PKG / "privacy.py").read_text(encoding="utf-8"))
+        modules = {node.module for node in ast.walk(tree) if isinstance(node, ast.ImportFrom) and node.level == 0 and (node.module or "").split(".")[0] == "coding_agent"}
+        modules |= {a.name for node in ast.walk(tree) if isinstance(node, ast.Import) for a in node.names if a.name.split(".")[0] == "coding_agent"}
+        self.assertEqual(modules, {"coding_agent.path_spellings"})
+        leaf = ast.parse((ROOT / "coding_agent" / "path_spellings.py").read_text(encoding="utf-8"))
+        imported = {a.name.split(".")[0] for n in ast.walk(leaf) if isinstance(n, ast.Import) for a in n.names} | {(n.module or "").split(".")[0] for n in ast.walk(leaf) if isinstance(n, ast.ImportFrom)}
+        self.assertLessEqual(imported, {"os", "pathlib", "ctypes"}, "the leaf stays stdlib-only and imports no project module")
 
     def test_workspace_primitives_do_not_depend_on_attach(self):
         for path in (ROOT / "coding_agent").glob("*.py"):
