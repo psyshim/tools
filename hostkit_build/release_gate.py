@@ -62,11 +62,12 @@ def check(name):
 
 
 def run_tests(modules, timeout):
+    began = time.time()
     done = subprocess.run([sys.executable, "-u", "-m", "unittest", *modules], cwd=ROOT, capture_output=True, text=True, timeout=timeout, errors="replace")
     tail = done.stderr[-4000:]
     ran = re.search(r"Ran (\d+) tests? in", tail)
     failed = re.findall(r"^(?:FAIL|ERROR): (\S+) \(([^)]*)\)", done.stderr, re.M)
-    return {"returncode": done.returncode, "ran": int(ran.group(1)) if ran else 0, "failures": [f"{b}" for _, b in failed][:20], "tail": tail[-600:]}
+    return {"returncode": done.returncode, "seconds": round(time.time() - began), "ran": int(ran.group(1)) if ran else 0, "failures": [f"{b}" for _, b in failed][:20], "tail": tail[-600:]}
 
 
 def test_groups():
@@ -216,7 +217,7 @@ def main(argv=None):
         if not bad and minutes > perf.BUDGETS["suite_wall_minutes"]:
             bad = [{"tail": f"the suite took {minutes:.0f} min; budget {perf.BUDGETS['suite_wall_minutes']} min"}]
         RESULTS.append({"check": "the complete test suite", "outcome": "FAIL" if bad else "PASS", "seconds": round(time.time() - started, 1),
-                        "detail": (f"failures: {failures[:10]}; {bad[0]['tail']}" if bad else f"{total} tests in {len(heavy) + len(rest)} modules")})
+                        "detail": (f"failures: {failures[:10]}; {bad[0]['tail']}" if bad else f"{total} tests in {len(heavy) + len(rest)} modules (process-heavy group {outcomes[0]['seconds']} s, rest {outcomes[1]['seconds']} s)")})
         print(f"{RESULTS[-1]['outcome']:4} the complete test suite  -- {RESULTS[-1]['detail'][:300]}", flush=True)
     else:
         RESULTS.append({"check": "the complete test suite", "outcome": "FAIL", "detail": "not run (--full is required for a delivery)", "seconds": 0})

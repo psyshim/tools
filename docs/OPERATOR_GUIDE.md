@@ -45,7 +45,7 @@ python -m device_agent --config grants.json --port 8780
 python -m coding_service --config service.json --port 8790
 ```
 
-Secrets are never in the file: hosts are identified by the hash of their credential; device tokens and the model key come from the environment variables named. `model` may also be `"path/to/model.py:complete"`. `http` device URLs are accepted only on loopback. Exit codes: `2` bad config, `4` the task store cannot be opened.
+Secrets are never in the file: hosts are identified by the hash of their credential; device tokens and the model key come from the environment variables named. `model` may also be `"path/to/model.py:complete"`. `http` device URLs are accepted only on loopback. Exit codes: `2` bad config, `4` the task store cannot be opened or read (do not retry blindly: inspect it), `5` the service must not use this database: **another service already owns it** (retry later) or it sits somewhere a lease cannot protect (network location, hard-linked file: fix the path).
 
 Mutation needs both sides: `allow_mutation: true` in the service **and** an effect grant on the device. Either alone leaves the installation read/propose.
 
@@ -53,6 +53,10 @@ Mutation needs both sides: `allow_mutation: true` in the service **and** an effe
 
 - Tasks and events are durable (SQLite WAL, full sync). A restarted service resumes tasks that never started and closes tasks that were running as `FAILED` ("interrupted"); the stale approval card cannot be answered.
 - If the process died while an **approved effect** was in flight, the task ends `NEEDS_RECONCILIATION`. It is never reported as success and never retried.
+
+### 3.1 One service per task database
+
+A service takes an OS-level lease (`<db>.service.lock`, next to the database) before it opens the database or loads the model, so a second service on the same database exits with code 5 before any recovery. Do not delete or replace that file while a service is alive. The lease is a local-filesystem guarantee, so a database on a Windows network location or with more than one name (hard link) is refused at start (exit code 5). Network filesystems on other platforms cannot be detected cheaply: keep the database on a local disk. Usage, export, backup and prune commands keep working while a service runs; restore writes to a NEW path.
 
 ## 4. Runbook: `NEEDS_RECONCILIATION`
 

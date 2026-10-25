@@ -14,6 +14,7 @@ import uvicorn
 
 from .app import build_manager, create_app
 from .config import ConfigError, load_config
+from .lease import LeaseError, ServiceAlreadyRunning
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -30,6 +31,12 @@ def main(argv=None):
         return 2
     try:
         manager = build_manager(config, os.environ)
+    except LeaseError as exc:
+        if isinstance(exc, ServiceAlreadyRunning):
+            print("service refuses to start: another service owns this task database; stop that service before restarting", file=sys.stderr)
+        else:
+            print(f"service refuses to start: {exc}", file=sys.stderr)
+        return 5
     except OSError as exc:
         print(f"service refuses to start: cannot open the task store ({type(exc).__name__}); it may be corrupt, locked or unwritable", file=sys.stderr)
         return 4
@@ -49,8 +56,10 @@ def main(argv=None):
             if server.started:
                 Path(args.ready_file).write_text(json.dumps({"port": server.servers[0].sockets[0].getsockname()[1], "pid": os.getpid()}), encoding="utf-8")
         threading.Thread(target=announce, daemon=True).start()
-    server.run()
-    manager.shutdown()
+    try:
+        server.run()
+    finally:
+        manager.shutdown()
     return 0
 
 if __name__ == "__main__":
