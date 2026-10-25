@@ -13,11 +13,22 @@ from .models import load_model
 from .protocol_router import make_protocol_router_for
 from .store import TaskStore
 from .device_client import DeviceClient
+from .lease import ServiceLease
 
 def build_manager(config, env, sleep=None):
-    store = TaskStore(config.db_path)
-    devices = {did: DeviceClient(spec["url"], spec["token"]) for did, spec in config.devices.items()}
-    return DurableManager(store, devices, config.hosts, load_model(config.model, env), allow_mutation=config.allow_mutation, max_tasks=config.max_tasks)
+    lease = ServiceLease(config.db_path)
+    store = None
+    try:
+        store = TaskStore(config.db_path)
+        devices = {did: DeviceClient(spec["url"], spec["token"]) for did, spec in config.devices.items()}
+        manager = DurableManager(store, devices, config.hosts, load_model(config.model, env), allow_mutation=config.allow_mutation, max_tasks=config.max_tasks)
+        manager._service_lease = lease
+        return manager
+    except BaseException:
+        if store is not None:
+            store.close()
+        lease.close()
+        raise
 
 def create_app(config, manager):
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)

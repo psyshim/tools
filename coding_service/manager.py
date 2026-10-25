@@ -28,6 +28,8 @@ class DurableManager:
         self._allow, self._max = bool(allow_mutation), max_tasks
         self._live, self._threads, self._lock = {}, {}, threading.Lock()
         self._cancel_pending = set()
+        self._stopping = False
+        self._service_lease = None
 
     @property
     def modes(self):
@@ -48,6 +50,8 @@ class DurableManager:
     def start(self, principal, workspace_ref, key, instruction):
         target = self._target(principal, workspace_ref)
         with self._lock:
+            if self._stopping:
+                raise Busy()
             if len(self._live) >= self._max and self.store.lookup(principal, key) is None:
                 raise Busy()
             task_id, state, created = self.store.create_or_get(principal, workspace_ref, key, instruction)
@@ -183,8 +187,14 @@ class DurableManager:
         return summary
 
     def shutdown(self, timeout=10):
+        with self._lock:
+            self._stopping = True
         for task in list(self._live.values()):
             if task is not None:
                 task.cancel()
         for thread in list(self._threads.values()):
             thread.join(timeout)
+        if not any(thread.is_alive() for thread in self._threads.values()):
+            if self._service_lease is not None:
+                self._service_lease.close()
+                self._service_lease = None
