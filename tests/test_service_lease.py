@@ -101,8 +101,12 @@ class ServiceLeaseTests(unittest.TestCase):
         self.assertNotIn("Traceback", stderr.getvalue())
 
     def test_second_real_service_cannot_recover_a_live_task(self):
-        from stack_harness import Stack
-        from test_service_recovery import db_rows, wait_for
+        try:
+            from stack_harness import Stack
+            from test_service_recovery import db_rows, wait_for
+        except ImportError:
+            from tests.stack_harness import Stack
+            from tests.test_service_recovery import db_rows, wait_for
         stack = Stack(self, env_extra={"MODEL_RELEASE_FLAG": str(self.db.parent / "release")}).start()
         gateway = stack.gateway()
         gateway.start_coding("alice", "shop", "wait for ownership test", conversation_id="lease", message_id="one")
