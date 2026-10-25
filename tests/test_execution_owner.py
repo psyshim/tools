@@ -22,9 +22,13 @@ class SingleExecutorTests(unittest.TestCase):
                 queue = ctx.Queue()
                 process = ctx.Process(target=contender, args=(root, queue))
                 process.start()
-                process.join(5)
+                process.join(60)          # a hang guard: a spawned interpreter needs tens of seconds to start on a heavily loaded Windows machine
+                if process.exitcode is None:
+                    process.terminate()
+                    process.join(10)
+                    self.fail("the contender process did not finish: it neither acquired nor reported busy")
                 self.assertEqual(process.exitcode, 0)
-                self.assertEqual(queue.get(timeout=1), "busy")
+                self.assertEqual(queue.get(timeout=10), "busy")
             with SingleExecutor(root):
                 pass
 
