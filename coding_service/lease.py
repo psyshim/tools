@@ -7,14 +7,48 @@ from pathlib import Path
 _HELD = set()
 
 
-class ServiceAlreadyRunning(OSError):
+class LeaseError(OSError):
+    """The service must not start on this database. The command line exits with code 5 (code 4 stays for a store that cannot be read)."""
+
+
+class ServiceAlreadyRunning(LeaseError):
     pass
+
+
+class LeaseUnsupported(LeaseError):
+    """The database sits somewhere an OS lock cannot protect: a network volume, or a file with more than one name."""
+
+
+def _is_remote(path):
+    """True for a Windows network location (UNC path or a mapped remote drive). Other platforms: not detected (documented)."""
+    if os.name != "nt":
+        return False
+    text = str(path)
+    if text.startswith("\\\\"):
+        return True
+    try:
+        import ctypes
+        return ctypes.windll.kernel32.GetDriveTypeW(Path(text).anchor) == 4
+    except (OSError, AttributeError, ValueError):
+        return False
+
+
+def check_location(database):
+    if _is_remote(database):
+        raise LeaseUnsupported("the task database is on a network location; an OS lease cannot protect it. Use a local disk")
+    try:
+        links = database.stat().st_nlink
+    except OSError:
+        return
+    if links > 1:
+        raise LeaseUnsupported("the task database has more than one name (hard link); the lease is per path and would not protect it. Use one canonical file")
 
 
 class ServiceLease:
     def __init__(self, database):
         database = Path(database).resolve()
         database.parent.mkdir(parents=True, exist_ok=True)
+        check_location(database)
         self.path = database.with_name(database.name + ".service.lock")
         self._file = open(self.path, "a+b")
         try:

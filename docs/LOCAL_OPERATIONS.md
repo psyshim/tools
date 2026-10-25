@@ -7,12 +7,13 @@ log persistence, retention or recovery.
 
 One service runtime may own a configured task database at a time. An OS-backed
 lease is acquired before opening the database or loading the model. A second
-runtime exits with code 4 before recovery; local usage/export/backup/prune remain
+runtime exits with code 5 before recovery; local usage/export/backup/prune remain
 available. The sibling `<db>.service.lock` file must stay in place: do not delete
 or replace it while a runtime is alive. A shutdown with a blocked model worker
 retains ownership until that worker finishes and shutdown is retried, or the
 process exits. This is a local filesystem lease, not a distributed/network-volume
-coordination guarantee; use one canonical database path, without hard-link aliases.
+coordination guarantee: a Windows network location or a hard-linked database is refused
+at start (also exit code 5); keep the database on a local disk under one canonical path.
 
 For a source-based attachment, the receiving repository can ignore the entire
 component directory, for example `/.external/code-attach/` in its own `.gitignore`.

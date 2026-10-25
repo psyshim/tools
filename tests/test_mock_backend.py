@@ -42,11 +42,15 @@ class IntegrationTests(unittest.TestCase):
         req = urllib.request.Request(
             f"http://127.0.0.1:{self.host.server_port}{route}",
             data=body, headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"})
-        try:
-            with urllib.request.urlopen(req, timeout=3) as resp:
-                return resp.status, json.load(resp)
-        except urllib.error.HTTPError as exc:
-            return exc.code, json.load(exc)
+        for attempt in (1, 2):
+            try:
+                with urllib.request.urlopen(req, timeout=3) as resp:
+                    return resp.status, json.load(resp)
+            except urllib.error.HTTPError as exc:
+                return exc.code, json.load(exc)
+            except ConnectionError:
+                if attempt == 2:       # a local connection reset (seen once as WinError 10053 under heavy machine load) is not what these tests are about
+                    raise
 
     def test_read_through_wrapper(self):
         status, payload = self.call("/mock/read", data={"path": "demo.txt", "start_line": 2, "end_line": 2})

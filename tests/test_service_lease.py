@@ -96,7 +96,7 @@ class ServiceLeaseTests(unittest.TestCase):
         from coding_service.__main__ import main
         stderr = io.StringIO()
         with patch("coding_service.__main__.load_config"), patch("coding_service.__main__.build_manager", side_effect=ServiceAlreadyRunning()), contextlib.redirect_stderr(stderr):
-            self.assertEqual(main(["--config", "fixture.json"]), 4)
+            self.assertEqual(main(["--config", "fixture.json"]), 5)
         self.assertIn("another service owns", stderr.getvalue())
         self.assertNotIn("Traceback", stderr.getvalue())
 
@@ -116,7 +116,7 @@ class ServiceLeaseTests(unittest.TestCase):
         second = subprocess.run([sys.executable, "-m", "coding_service", "--config", str(stack.base / "service.json"),
                                  "--port", "0", "--ready-file", str(ready)], cwd=stack.service_tree,
                                 env=env, capture_output=True, text=True, timeout=30)
-        self.assertEqual(second.returncode, 4, second.stderr)
+        self.assertEqual(second.returncode, 5, second.stderr)
         self.assertIn("another service owns", second.stderr)
         self.assertFalse(ready.exists())
         self.assertEqual(db_rows(stack, "SELECT state FROM tasks"), [("RUNNING",)])
