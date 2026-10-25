@@ -46,7 +46,10 @@ class Locations(unittest.TestCase):
 
     @unittest.skipUnless(os.name == "nt", "UNC paths are a Windows form")
     def test_unc_paths_are_recognised_as_remote(self):
-        self.assertTrue(_is_remote("\\\\server\\share\\tasks.db"))
+        bs = chr(92)
+        self.assertTrue(_is_remote(bs * 2 + "server" + bs + "share" + bs + "tasks.db"))
+        self.assertTrue(_is_remote(bs * 2 + "?" + bs + "UNC" + bs + "server" + bs + "share" + bs + "tasks.db"), "the long-path spelling of a network share")
+        self.assertFalse(_is_remote(bs * 2 + "?" + bs + "C:" + bs + "local" + bs + "tasks.db"), "the long-path spelling of a LOCAL drive")
         self.assertFalse(_is_remote(self.root / "tasks.db"))
 
     def test_both_refusals_are_lease_errors_and_not_confusable_with_a_store_failure(self):

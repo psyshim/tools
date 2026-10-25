@@ -20,17 +20,16 @@ class LeaseUnsupported(LeaseError):
 
 
 def _is_remote(path):
-    """True for a Windows network location (UNC path or a mapped remote drive). Other platforms: not detected (documented)."""
+    """True for a Windows network location. The caller passes a RESOLVED path: Windows resolves a mapped network drive to its UNC
+    form, so a path string is enough and the service needs no system-call access (its isolation test forbids ctypes).
+    Other platforms: not detected (documented)."""
     if os.name != "nt":
         return False
     text = str(path)
-    if text.startswith("\\\\"):
+    bs = chr(92)
+    if text.upper().startswith(bs * 2 + "?" + bs + "UNC" + bs):
         return True
-    try:
-        import ctypes
-        return ctypes.windll.kernel32.GetDriveTypeW(Path(text).anchor) == 4
-    except (OSError, AttributeError, ValueError):
-        return False
+    return text.startswith(bs * 2) and not text.startswith((bs * 2 + "?" + bs, bs * 2 + "." + bs))
 
 
 def check_location(database):
